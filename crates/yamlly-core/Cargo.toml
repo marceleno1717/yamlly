@@ -1,0 +1,17 @@
+[package]
+name = "yamlly-core"
+version = "0.0.1"
+edition = "2021"
+description = "Core schema loader, form tree builder, state engine, and YAML emitter for yamlly"
+license-file = "LICENSE"
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+indexmap = { version = "2.7", features = ["serde"] }
+thiserror = "1.0"

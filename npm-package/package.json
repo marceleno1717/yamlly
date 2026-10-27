@@ -1,0 +1,44 @@
+{
+  "name": "yamlly",
+  "version": "0.0.1",
+  "description": "An interactive terminal UI (TUI) for building and editing Kubernetes YAML manifests",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marceleno1717/yamlly"
+  },
+  "homepage": "https://github.com/marceleno1717/yamlly#readme",
+  "keywords": [
+    "kubernetes",
+    "k8s",
+    "yaml",
+    "tui",
+    "terminal",
+    "cli",
+    "manifest"
+  ],
+  "bin": {
+    "yamlly": "bin/yamlly.js"
+  },
+  "files": [
+    "bin/yamlly.js",
+    "scripts/postinstall.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "optionalDependencies": {
+    "@yamlly/linux-x64-bin": "0.0.1",
+    "@yamlly/darwin-x64-bin": "0.0.1",
+    "@yamlly/darwin-arm64-bin": "0.0.1",
+    "@yamlly/win32-x64-bin": "0.0.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

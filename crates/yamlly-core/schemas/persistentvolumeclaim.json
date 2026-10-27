@@ -1,0 +1,417 @@
+{
+  "kind": "PersistentVolumeClaim",
+  "apiVersion": "v1",
+  "resource": "persistentvolumeclaim",
+  "common_fields": [
+    "metadata.name",
+    "metadata.namespace",
+    "metadata.labels",
+    "spec.accessModes",
+    "spec.storageClassName",
+    "spec.resources.requests.storage",
+    "spec.volumeMode"
+  ],
+  "fields": {
+    "apiVersion": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "kind": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "metadata": {
+      "type": "ObjectMeta",
+      "required": false,
+      "fields": {
+        "annotations": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "deletionGracePeriodSeconds": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "deletionTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "finalizers": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "generateName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "generation": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "labels": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "managedFields": {
+          "type": "[]ManagedFieldsEntry",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsV1": {
+              "type": "FieldsV1",
+              "required": false,
+              "fields": {}
+            },
+            "manager": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "operation": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "subresource": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "time": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "namespace": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "ownerReferences": {
+          "type": "[]OwnerReference",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "blockOwnerDeletion": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "controller": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "kind": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "uid": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "resourceVersion": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "selfLink": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "uid": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    },
+    "spec": {
+      "type": "PersistentVolumeClaimSpec",
+      "required": false,
+      "fields": {
+        "accessModes": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "dataSource": {
+          "type": "TypedLocalObjectReference",
+          "required": false,
+          "fields": {
+            "apiGroup": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "kind": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "dataSourceRef": {
+          "type": "TypedObjectReference",
+          "required": false,
+          "fields": {
+            "apiGroup": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "kind": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "namespace": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "resources": {
+          "type": "VolumeResourceRequirements",
+          "required": false,
+          "fields": {
+            "limits": {
+              "type": "map[string]Quantity",
+              "required": false,
+              "fields": {}
+            },
+            "requests": {
+              "type": "map[string]Quantity",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "selector": {
+          "type": "LabelSelector",
+          "required": false,
+          "fields": {
+            "matchExpressions": {
+              "type": "[]LabelSelectorRequirement",
+              "required": false,
+              "fields": {
+                "key": {
+                  "type": "string",
+                  "required": true,
+                  "fields": {}
+                },
+                "operator": {
+                  "type": "string",
+                  "required": true,
+                  "fields": {}
+                },
+                "values": {
+                  "type": "[]string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            },
+            "matchLabels": {
+              "type": "map[string]string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "storageClassName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "volumeAttributesClassName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "volumeMode": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "enum:": {
+          "type": "",
+          "required": false,
+          "enum": [
+            "Block",
+            "Filesystem"
+          ],
+          "fields": {}
+        },
+        "volumeName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    },
+    "status": {
+      "type": "PersistentVolumeClaimStatus",
+      "required": false,
+      "fields": {
+        "accessModes": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "allocatedResourceStatuses": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "allocatedResources": {
+          "type": "map[string]Quantity",
+          "required": false,
+          "fields": {}
+        },
+        "capacity": {
+          "type": "map[string]Quantity",
+          "required": false,
+          "fields": {}
+        },
+        "conditions": {
+          "type": "[]PersistentVolumeClaimCondition",
+          "required": false,
+          "fields": {
+            "lastProbeTime": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "lastTransitionTime": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "message": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "reason": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "status": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "type": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "currentVolumeAttributesClassName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "modifyVolumeStatus": {
+          "type": "ModifyVolumeStatus",
+          "required": false,
+          "fields": {
+            "status": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "enum:": {
+              "type": "",
+              "required": false,
+              "enum": [
+                "InProgress",
+                "Infeasible",
+                "Pending"
+              ],
+              "fields": {}
+            },
+            "targetVolumeAttributesClassName": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "phase": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "enum:": {
+          "type": "",
+          "required": false,
+          "enum": [
+            "Bound",
+            "Lost",
+            "Pending"
+          ],
+          "fields": {}
+        }
+      }
+    }
+  }
+}

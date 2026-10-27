@@ -1,0 +1,39 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "yamlly"
+version = "0.0.1"
+description = "yamlly — an interactive terminal UI (TUI) for building Kubernetes YAML manifests"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+keywords = ["kubernetes", "k8s", "yaml", "tui", "terminal", "cli", "manifest"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/marceleno1717/yamlly"
+Repository = "https://github.com/marceleno1717/yamlly"
+Issues = "https://github.com/marceleno1717/yamlly/issues"
+
+[tool.maturin]
+bindings = "bin"
+manifest-path = "crates/yamlly-cli/Cargo.toml"
+strip = true
+include = [
+    "Cargo.toml",
+    "Cargo.lock",
+    "LICENSE",
+    "README.md",
+    "crates/yamlly-core/**/*",
+    "crates/yamlly-cli/**/*",
+]

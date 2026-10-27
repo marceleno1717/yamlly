@@ -1,0 +1,346 @@
+{
+  "resources": [
+    {
+      "kind": "Deployment",
+      "apiVersion": "apps/v1",
+      "resource": "deployment",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "metadata.labels",
+        "spec.replicas",
+        "spec.selector.matchLabels",
+        "spec.template.metadata.labels",
+        "spec.template.spec.containers[].name",
+        "spec.template.spec.containers[].image",
+        "spec.template.spec.containers[].ports[].containerPort",
+        "spec.template.spec.containers[].env[].name",
+        "spec.template.spec.containers[].env[].value",
+        "spec.template.spec.containers[].resources.requests.cpu",
+        "spec.template.spec.containers[].resources.requests.memory",
+        "spec.template.spec.containers[].resources.limits.cpu",
+        "spec.template.spec.containers[].resources.limits.memory"
+      ]
+    },
+    {
+      "kind": "Service",
+      "apiVersion": "v1",
+      "resource": "service",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "metadata.labels",
+        "spec.selector",
+        "spec.type",
+        "spec.ports[].port",
+        "spec.ports[].targetPort",
+        "spec.ports[].protocol",
+        "spec.ports[].name"
+      ]
+    },
+    {
+      "kind": "ConfigMap",
+      "apiVersion": "v1",
+      "resource": "configmap",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "metadata.labels",
+        "data",
+        "binaryData"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "apiVersion": "v1",
+      "resource": "pod",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "metadata.labels",
+        "spec.containers[].name",
+        "spec.containers[].image",
+        "spec.containers[].ports[].containerPort",
+        "spec.containers[].env[].name",
+        "spec.containers[].env[].value",
+        "spec.containers[].resources.requests.cpu",
+        "spec.containers[].resources.requests.memory",
+        "spec.restartPolicy",
+        "spec.serviceAccountName"
+      ]
+    },
+    {
+      "kind": "StatefulSet",
+      "apiVersion": "apps/v1",
+      "resource": "statefulset",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "metadata.labels",
+        "spec.replicas",
+        "spec.serviceName",
+        "spec.selector.matchLabels",
+        "spec.template.metadata.labels",
+        "spec.template.spec.containers[].name",
+        "spec.template.spec.containers[].image",
+        "spec.template.spec.containers[].ports[].containerPort",
+        "spec.volumeClaimTemplates[].metadata.name",
+        "spec.volumeClaimTemplates[].spec.accessModes",
+        "spec.volumeClaimTemplates[].spec.resources.requests.storage"
+      ]
+    },
+    {
+      "kind": "DaemonSet",
+      "apiVersion": "apps/v1",
+      "resource": "daemonset",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "metadata.labels",
+        "spec.selector.matchLabels",
+        "spec.template.metadata.labels",
+        "spec.template.spec.containers[].name",
+        "spec.template.spec.containers[].image",
+        "spec.template.spec.containers[].ports[].containerPort",
+        "spec.updateStrategy.type"
+      ]
+    },
+    {
+      "kind": "Job",
+      "apiVersion": "batch/v1",
+      "resource": "job",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "metadata.labels",
+        "spec.completions",
+        "spec.parallelism",
+        "spec.backoffLimit",
+        "spec.template.spec.containers[].name",
+        "spec.template.spec.containers[].image",
+        "spec.template.spec.restartPolicy"
+      ]
+    },
+    {
+      "kind": "CronJob",
+      "apiVersion": "batch/v1",
+      "resource": "cronjob",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "metadata.labels",
+        "spec.schedule",
+        "spec.suspend",
+        "spec.jobTemplate.spec.template.spec.containers[].name",
+        "spec.jobTemplate.spec.template.spec.containers[].image",
+        "spec.jobTemplate.spec.template.spec.restartPolicy",
+        "spec.successfulJobsHistoryLimit",
+        "spec.failedJobsHistoryLimit"
+      ]
+    },
+    {
+      "kind": "Ingress",
+      "apiVersion": "networking.k8s.io/v1",
+      "resource": "ingress",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "metadata.labels",
+        "metadata.annotations",
+        "spec.ingressClassName",
+        "spec.rules[].host",
+        "spec.rules[].http.paths[].path",
+        "spec.rules[].http.paths[].pathType",
+        "spec.rules[].http.paths[].backend.service.name",
+        "spec.rules[].http.paths[].backend.service.port.number",
+        "spec.tls[].hosts",
+        "spec.tls[].secretName"
+      ]
+    },
+    {
+      "kind": "PersistentVolumeClaim",
+      "apiVersion": "v1",
+      "resource": "persistentvolumeclaim",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "metadata.labels",
+        "spec.accessModes",
+        "spec.storageClassName",
+        "spec.resources.requests.storage",
+        "spec.volumeMode"
+      ]
+    },
+    {
+      "kind": "PersistentVolume",
+      "apiVersion": "v1",
+      "resource": "persistentvolume",
+      "common_fields": [
+        "metadata.name",
+        "metadata.labels",
+        "spec.capacity.storage",
+        "spec.accessModes",
+        "spec.persistentVolumeReclaimPolicy",
+        "spec.storageClassName",
+        "spec.volumeMode",
+        "spec.hostPath.path",
+        "spec.nfs.server",
+        "spec.nfs.path"
+      ]
+    },
+    {
+      "kind": "HorizontalPodAutoscaler",
+      "apiVersion": "autoscaling/v2",
+      "resource": "horizontalpodautoscaler",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "spec.scaleTargetRef.apiVersion",
+        "spec.scaleTargetRef.kind",
+        "spec.scaleTargetRef.name",
+        "spec.minReplicas",
+        "spec.maxReplicas",
+        "spec.metrics[].type",
+        "spec.metrics[].resource.name",
+        "spec.metrics[].resource.target.type",
+        "spec.metrics[].resource.target.averageUtilization"
+      ]
+    },
+    {
+      "kind": "ServiceAccount",
+      "apiVersion": "v1",
+      "resource": "serviceaccount",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "metadata.labels",
+        "automountServiceAccountToken",
+        "imagePullSecrets[].name"
+      ]
+    },
+    {
+      "kind": "Role",
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "resource": "role",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "rules[].apiGroups",
+        "rules[].resources",
+        "rules[].verbs",
+        "rules[].resourceNames"
+      ]
+    },
+    {
+      "kind": "RoleBinding",
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "resource": "rolebinding",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "roleRef.apiGroup",
+        "roleRef.kind",
+        "roleRef.name",
+        "subjects[].kind",
+        "subjects[].name",
+        "subjects[].namespace"
+      ]
+    },
+    {
+      "kind": "ClusterRole",
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "resource": "clusterrole",
+      "common_fields": [
+        "metadata.name",
+        "metadata.labels",
+        "rules[].apiGroups",
+        "rules[].resources",
+        "rules[].verbs",
+        "rules[].resourceNames",
+        "aggregationRule.clusterRoleSelectors[].matchLabels"
+      ]
+    },
+    {
+      "kind": "ClusterRoleBinding",
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "resource": "clusterrolebinding",
+      "common_fields": [
+        "metadata.name",
+        "metadata.labels",
+        "roleRef.apiGroup",
+        "roleRef.kind",
+        "roleRef.name",
+        "subjects[].kind",
+        "subjects[].name",
+        "subjects[].namespace"
+      ]
+    },
+    {
+      "kind": "NetworkPolicy",
+      "apiVersion": "networking.k8s.io/v1",
+      "resource": "networkpolicy",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "spec.podSelector.matchLabels",
+        "spec.policyTypes",
+        "spec.ingress[].from[].podSelector.matchLabels",
+        "spec.ingress[].from[].namespaceSelector.matchLabels",
+        "spec.ingress[].ports[].port",
+        "spec.ingress[].ports[].protocol",
+        "spec.egress[].to[].podSelector.matchLabels",
+        "spec.egress[].ports[].port"
+      ]
+    },
+    {
+      "kind": "Namespace",
+      "apiVersion": "v1",
+      "resource": "namespace",
+      "common_fields": [
+        "metadata.name",
+        "metadata.labels",
+        "metadata.annotations"
+      ]
+    },
+    {
+      "kind": "Secret",
+      "apiVersion": "v1",
+      "resource": "secret",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "metadata.labels",
+        "type",
+        "data",
+        "stringData"
+      ]
+    },
+    {
+      "kind": "LimitRange",
+      "apiVersion": "v1",
+      "resource": "limitrange",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "spec.limits[].type",
+        "spec.limits[].default.cpu",
+        "spec.limits[].default.memory",
+        "spec.limits[].defaultRequest.cpu",
+        "spec.limits[].defaultRequest.memory",
+        "spec.limits[].max.cpu",
+        "spec.limits[].max.memory"
+      ]
+    },
+    {
+      "kind": "ResourceQuota",
+      "apiVersion": "v1",
+      "resource": "resourcequota",
+      "common_fields": [
+        "metadata.name",
+        "metadata.namespace",
+        "spec.hard",
+        "spec.scopes"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+[package]
+name = "yamlly"
+version = "0.0.1"
+edition = "2024"
+description = "An interactive terminal UI (TUI) for building and editing Kubernetes YAML manifests"
+license-file = "LICENSE"
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[[bin]]
+name = "yamlly"
+path = "src/main.rs"
+
+[dependencies]
+yamlly-core = { version = "0.0.1", path = "../yamlly-core" }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+ratcn = { version = "0.0.6", features = ["crossterm"] }
+ratatui = { version = "0.30.2", default-features = false, features = ["layout-cache", "std", "crossterm"] }
+crossterm = "0.29"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }

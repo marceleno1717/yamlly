@@ -1,0 +1,24 @@
+[workspace]
+members = [
+    "crates/yamlly-core",
+    "crates/yamlly-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.0.1"
+repository = "https://github.com/marceleno1717/yamlly"
+homepage = "https://github.com/marceleno1717/yamlly#readme"
+keywords = ["kubernetes", "k8s", "yaml", "tui", "cli"]
+categories = ["command-line-utilities", "development-tools", "config"]
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+# TUI is redraw-bound, not size-bound. Measured: opt-level=3 vs "z" gives
+# ~1.7x on ui::draw and ~1.9x on emit, for a size cost that is irrelevant
+# next to the ~1.9MB of embedded schemas already in the binary.
+# Do not lower this -- "z" was only a placeholder.
+opt-level = 3

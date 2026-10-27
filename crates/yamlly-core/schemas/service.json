@@ -1,0 +1,446 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1",
+  "resource": "service",
+  "common_fields": [
+    "metadata.name",
+    "metadata.namespace",
+    "metadata.labels",
+    "spec.selector",
+    "spec.type",
+    "spec.ports[].port",
+    "spec.ports[].targetPort",
+    "spec.ports[].protocol",
+    "spec.ports[].name"
+  ],
+  "fields": {
+    "apiVersion": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "kind": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "metadata": {
+      "type": "ObjectMeta",
+      "required": false,
+      "fields": {
+        "annotations": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "deletionGracePeriodSeconds": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "deletionTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "finalizers": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "generateName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "generation": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "labels": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "managedFields": {
+          "type": "[]ManagedFieldsEntry",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsV1": {
+              "type": "FieldsV1",
+              "required": false,
+              "fields": {}
+            },
+            "manager": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "operation": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "subresource": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "time": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "namespace": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "ownerReferences": {
+          "type": "[]OwnerReference",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "blockOwnerDeletion": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "controller": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "kind": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "uid": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "resourceVersion": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "selfLink": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "uid": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    },
+    "spec": {
+      "type": "ServiceSpec",
+      "required": false,
+      "fields": {
+        "allocateLoadBalancerNodePorts": {
+          "type": "boolean",
+          "required": false,
+          "fields": {}
+        },
+        "clusterIP": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "clusterIPs": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "externalIPs": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "externalName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "externalTrafficPolicy": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "enum:": {
+          "type": "",
+          "required": false,
+          "enum": [
+            "ClusterIP",
+            "ExternalName",
+            "LoadBalancer",
+            "NodePort"
+          ],
+          "fields": {}
+        },
+        "healthCheckNodePort": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "internalTrafficPolicy": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "ipFamilies": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "ipFamilyPolicy": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "loadBalancerClass": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "loadBalancerIP": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "loadBalancerSourceRanges": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "ports": {
+          "type": "[]ServicePort",
+          "required": false,
+          "fields": {
+            "appProtocol": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "name": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "nodePort": {
+              "type": "integer",
+              "required": false,
+              "fields": {}
+            },
+            "port": {
+              "type": "integer",
+              "required": true,
+              "fields": {}
+            },
+            "protocol": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "enum:": {
+              "type": "",
+              "required": false,
+              "enum": [
+                "SCTP",
+                "TCP",
+                "UDP"
+              ],
+              "fields": {}
+            },
+            "targetPort": {
+              "type": "IntOrString",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "publishNotReadyAddresses": {
+          "type": "boolean",
+          "required": false,
+          "fields": {}
+        },
+        "selector": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "sessionAffinity": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "sessionAffinityConfig": {
+          "type": "SessionAffinityConfig",
+          "required": false,
+          "fields": {
+            "clientIP": {
+              "type": "ClientIPConfig",
+              "required": false,
+              "fields": {
+                "timeoutSeconds": {
+                  "type": "integer",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            }
+          }
+        },
+        "trafficDistribution": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "type": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    },
+    "status": {
+      "type": "ServiceStatus",
+      "required": false,
+      "fields": {
+        "conditions": {
+          "type": "[]Condition",
+          "required": false,
+          "fields": {
+            "lastTransitionTime": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "message": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "observedGeneration": {
+              "type": "integer",
+              "required": false,
+              "fields": {}
+            },
+            "reason": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "status": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "type": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "loadBalancer": {
+          "type": "LoadBalancerStatus",
+          "required": false,
+          "fields": {
+            "ingress": {
+              "type": "[]LoadBalancerIngress",
+              "required": false,
+              "fields": {
+                "hostname": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "ip": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "ipMode": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "ports": {
+                  "type": "[]PortStatus",
+                  "required": false,
+                  "fields": {
+                    "error": {
+                      "type": "string",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "port": {
+                      "type": "integer",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "protocol": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "enum:": {
+                      "type": "",
+                      "required": false,
+                      "enum": [
+                        "SCTP",
+                        "TCP",
+                        "UDP"
+                      ],
+                      "fields": {}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

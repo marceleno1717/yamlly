@@ -1,0 +1,15 @@
+{
+  "name": "@yamlly/darwin-x64-bin",
+  "version": "0.0.1",
+  "description": "yamlly pre-built native binary for darwin-x64",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "os": ["darwin"],
+  "cpu": ["x64"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marceleno1717/yamlly"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

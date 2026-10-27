@@ -1,0 +1,241 @@
+{
+  "kind": "ResourceQuota",
+  "apiVersion": "v1",
+  "resource": "resourcequota",
+  "common_fields": [
+    "metadata.name",
+    "metadata.namespace",
+    "spec.hard",
+    "spec.scopes"
+  ],
+  "fields": {
+    "apiVersion": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "kind": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "metadata": {
+      "type": "ObjectMeta",
+      "required": false,
+      "fields": {
+        "annotations": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "deletionGracePeriodSeconds": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "deletionTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "finalizers": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "generateName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "generation": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "labels": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "managedFields": {
+          "type": "[]ManagedFieldsEntry",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsV1": {
+              "type": "FieldsV1",
+              "required": false,
+              "fields": {}
+            },
+            "manager": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "operation": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "subresource": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "time": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "namespace": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "ownerReferences": {
+          "type": "[]OwnerReference",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "blockOwnerDeletion": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "controller": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "kind": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "uid": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "resourceVersion": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "selfLink": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "uid": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    },
+    "spec": {
+      "type": "ResourceQuotaSpec",
+      "required": false,
+      "fields": {
+        "hard": {
+          "type": "map[string]Quantity",
+          "required": false,
+          "fields": {}
+        },
+        "scopeSelector": {
+          "type": "ScopeSelector",
+          "required": false,
+          "fields": {
+            "matchExpressions": {
+              "type": "[]ScopedResourceSelectorRequirement",
+              "required": false,
+              "fields": {
+                "operator": {
+                  "type": "string",
+                  "required": true,
+                  "fields": {}
+                },
+                "enum:": {
+                  "type": "",
+                  "required": false,
+                  "enum": [
+                    "BestEffort",
+                    "CrossNamespacePodAffinity",
+                    "NotBestEffort",
+                    "NotTerminating"
+                  ],
+                  "fields": {}
+                },
+                "scopeName": {
+                  "type": "string",
+                  "required": true,
+                  "fields": {}
+                },
+                "values": {
+                  "type": "[]string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            }
+          }
+        },
+        "scopes": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    },
+    "status": {
+      "type": "ResourceQuotaStatus",
+      "required": false,
+      "fields": {
+        "hard": {
+          "type": "map[string]Quantity",
+          "required": false,
+          "fields": {}
+        },
+        "used": {
+          "type": "map[string]Quantity",
+          "required": false,
+          "fields": {}
+        }
+      }
+    }
+  }
+}

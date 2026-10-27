@@ -1,0 +1,222 @@
+{
+  "kind": "ClusterRoleBinding",
+  "apiVersion": "rbac.authorization.k8s.io/v1",
+  "resource": "clusterrolebinding",
+  "common_fields": [
+    "metadata.name",
+    "metadata.labels",
+    "roleRef.apiGroup",
+    "roleRef.kind",
+    "roleRef.name",
+    "subjects[].kind",
+    "subjects[].name",
+    "subjects[].namespace"
+  ],
+  "fields": {
+    "apiVersion": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "kind": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "metadata": {
+      "type": "ObjectMeta",
+      "required": false,
+      "fields": {
+        "annotations": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "deletionGracePeriodSeconds": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "deletionTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "finalizers": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "generateName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "generation": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "labels": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "managedFields": {
+          "type": "[]ManagedFieldsEntry",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsV1": {
+              "type": "FieldsV1",
+              "required": false,
+              "fields": {}
+            },
+            "manager": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "operation": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "subresource": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "time": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "namespace": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "ownerReferences": {
+          "type": "[]OwnerReference",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "blockOwnerDeletion": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "controller": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "kind": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "uid": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "resourceVersion": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "selfLink": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "uid": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    },
+    "roleRef": {
+      "type": "RoleRef",
+      "required": true,
+      "fields": {
+        "apiGroup": {
+          "type": "string",
+          "required": true,
+          "fields": {}
+        },
+        "kind": {
+          "type": "string",
+          "required": true,
+          "fields": {}
+        },
+        "name": {
+          "type": "string",
+          "required": true,
+          "fields": {}
+        }
+      }
+    },
+    "subjects": {
+      "type": "[]Subject",
+      "required": false,
+      "fields": {
+        "apiGroup": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "kind": {
+          "type": "string",
+          "required": true,
+          "fields": {}
+        },
+        "name": {
+          "type": "string",
+          "required": true,
+          "fields": {}
+        },
+        "namespace": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    }
+  }
+}

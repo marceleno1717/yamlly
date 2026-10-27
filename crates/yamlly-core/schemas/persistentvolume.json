@@ -1,0 +1,1247 @@
+{
+  "kind": "PersistentVolume",
+  "apiVersion": "v1",
+  "resource": "persistentvolume",
+  "common_fields": [
+    "metadata.name",
+    "metadata.labels",
+    "spec.capacity.storage",
+    "spec.accessModes",
+    "spec.persistentVolumeReclaimPolicy",
+    "spec.storageClassName",
+    "spec.volumeMode",
+    "spec.hostPath.path",
+    "spec.nfs.server",
+    "spec.nfs.path"
+  ],
+  "fields": {
+    "apiVersion": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "kind": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "metadata": {
+      "type": "ObjectMeta",
+      "required": false,
+      "fields": {
+        "annotations": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "deletionGracePeriodSeconds": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "deletionTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "finalizers": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "generateName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "generation": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "labels": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "managedFields": {
+          "type": "[]ManagedFieldsEntry",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsV1": {
+              "type": "FieldsV1",
+              "required": false,
+              "fields": {}
+            },
+            "manager": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "operation": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "subresource": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "time": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "namespace": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "ownerReferences": {
+          "type": "[]OwnerReference",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "blockOwnerDeletion": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "controller": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "kind": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "uid": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "resourceVersion": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "selfLink": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "uid": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    },
+    "spec": {
+      "type": "PersistentVolumeSpec",
+      "required": false,
+      "fields": {
+        "accessModes": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "awsElasticBlockStore": {
+          "type": "AWSElasticBlockStoreVolumeSource",
+          "required": false,
+          "fields": {
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "partition": {
+              "type": "integer",
+              "required": false,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "volumeID": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "azureDisk": {
+          "type": "AzureDiskVolumeSource",
+          "required": false,
+          "fields": {
+            "cachingMode": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "enum:": {
+              "type": "",
+              "required": false,
+              "enum": [
+                "Dedicated",
+                "Managed",
+                "Shared"
+              ],
+              "fields": {}
+            },
+            "diskName": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "diskURI": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "kind": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "azureFile": {
+          "type": "AzureFilePersistentVolumeSource",
+          "required": false,
+          "fields": {
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "secretName": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "secretNamespace": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "shareName": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "capacity": {
+          "type": "map[string]Quantity",
+          "required": false,
+          "fields": {}
+        },
+        "cephfs": {
+          "type": "CephFSPersistentVolumeSource",
+          "required": false,
+          "fields": {
+            "monitors": {
+              "type": "[]string",
+              "required": true,
+              "fields": {}
+            },
+            "path": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "secretFile": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "secretRef": {
+              "type": "SecretReference",
+              "required": false,
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "namespace": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            },
+            "user": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "cinder": {
+          "type": "CinderPersistentVolumeSource",
+          "required": false,
+          "fields": {
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "secretRef": {
+              "type": "SecretReference",
+              "required": false,
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "namespace": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            },
+            "volumeID": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "claimRef": {
+          "type": "ObjectReference",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldPath": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "kind": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "name": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "namespace": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "resourceVersion": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "uid": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "csi": {
+          "type": "CSIPersistentVolumeSource",
+          "required": false,
+          "fields": {
+            "controllerExpandSecretRef": {
+              "type": "SecretReference",
+              "required": false,
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "namespace": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            },
+            "controllerPublishSecretRef": {
+              "type": "SecretReference",
+              "required": false,
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "namespace": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            },
+            "driver": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "nodeExpandSecretRef": {
+              "type": "SecretReference",
+              "required": false,
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "namespace": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            },
+            "nodePublishSecretRef": {
+              "type": "SecretReference",
+              "required": false,
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "namespace": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            },
+            "nodeStageSecretRef": {
+              "type": "SecretReference",
+              "required": false,
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "namespace": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "volumeAttributes": {
+              "type": "map[string]string",
+              "required": false,
+              "fields": {}
+            },
+            "volumeHandle": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "fc": {
+          "type": "FCVolumeSource",
+          "required": false,
+          "fields": {
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "lun": {
+              "type": "integer",
+              "required": false,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "targetWWNs": {
+              "type": "[]string",
+              "required": false,
+              "fields": {}
+            },
+            "wwids": {
+              "type": "[]string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "flexVolume": {
+          "type": "FlexPersistentVolumeSource",
+          "required": false,
+          "fields": {
+            "driver": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "options": {
+              "type": "map[string]string",
+              "required": false,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "secretRef": {
+              "type": "SecretReference",
+              "required": false,
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "namespace": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            }
+          }
+        },
+        "flocker": {
+          "type": "FlockerVolumeSource",
+          "required": false,
+          "fields": {
+            "datasetName": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "datasetUUID": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "gcePersistentDisk": {
+          "type": "GCEPersistentDiskVolumeSource",
+          "required": false,
+          "fields": {
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "partition": {
+              "type": "integer",
+              "required": false,
+              "fields": {}
+            },
+            "pdName": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "glusterfs": {
+          "type": "GlusterfsPersistentVolumeSource",
+          "required": false,
+          "fields": {
+            "endpoints": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "endpointsNamespace": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "path": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "hostPath": {
+          "type": "HostPathVolumeSource",
+          "required": false,
+          "fields": {
+            "path": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "type": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "enum:": {
+              "type": "",
+              "required": false,
+              "enum": [
+                "\"\"",
+                "BlockDevice",
+                "CharDevice",
+                "Directory"
+              ],
+              "fields": {}
+            }
+          }
+        },
+        "iscsi": {
+          "type": "ISCSIPersistentVolumeSource",
+          "required": false,
+          "fields": {
+            "chapAuthDiscovery": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "chapAuthSession": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "initiatorName": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "iqn": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "iscsiInterface": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "lun": {
+              "type": "integer",
+              "required": true,
+              "fields": {}
+            },
+            "portals": {
+              "type": "[]string",
+              "required": false,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "secretRef": {
+              "type": "SecretReference",
+              "required": false,
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "namespace": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            },
+            "targetPortal": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "local": {
+          "type": "LocalVolumeSource",
+          "required": false,
+          "fields": {
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "path": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "mountOptions": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "nfs": {
+          "type": "NFSVolumeSource",
+          "required": false,
+          "fields": {
+            "path": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "server": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "nodeAffinity": {
+          "type": "VolumeNodeAffinity",
+          "required": false,
+          "fields": {
+            "required": {
+              "type": "NodeSelector",
+              "required": false,
+              "fields": {
+                "nodeSelectorTerms": {
+                  "type": "[]NodeSelectorTerm",
+                  "required": true,
+                  "fields": {
+                    "matchExpressions": {
+                      "type": "[]NodeSelectorRequirement",
+                      "required": false,
+                      "fields": {
+                        "key": {
+                          "type": "string",
+                          "required": true,
+                          "fields": {}
+                        },
+                        "operator": {
+                          "type": "string",
+                          "required": true,
+                          "fields": {}
+                        },
+                        "enum:": {
+                          "type": "",
+                          "required": false,
+                          "enum": [
+                            "DoesNotExist",
+                            "Exists",
+                            "Gt",
+                            "In"
+                          ],
+                          "fields": {}
+                        },
+                        "values": {
+                          "type": "[]string",
+                          "required": false,
+                          "fields": {}
+                        }
+                      }
+                    },
+                    "matchFields": {
+                      "type": "[]NodeSelectorRequirement",
+                      "required": false,
+                      "fields": {
+                        "key": {
+                          "type": "string",
+                          "required": true,
+                          "fields": {}
+                        },
+                        "operator": {
+                          "type": "string",
+                          "required": true,
+                          "fields": {}
+                        },
+                        "enum:": {
+                          "type": "",
+                          "required": false,
+                          "enum": [
+                            "DoesNotExist",
+                            "Exists",
+                            "Gt",
+                            "In"
+                          ],
+                          "fields": {}
+                        },
+                        "values": {
+                          "type": "[]string",
+                          "required": false,
+                          "fields": {}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "persistentVolumeReclaimPolicy": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "enum:": {
+          "type": "",
+          "required": false,
+          "enum": [
+            "Block",
+            "Filesystem"
+          ],
+          "fields": {}
+        },
+        "photonPersistentDisk": {
+          "type": "PhotonPersistentDiskVolumeSource",
+          "required": false,
+          "fields": {
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "pdID": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "portworxVolume": {
+          "type": "PortworxVolumeSource",
+          "required": false,
+          "fields": {
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "volumeID": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "quobyte": {
+          "type": "QuobyteVolumeSource",
+          "required": false,
+          "fields": {
+            "group": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "registry": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "tenant": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "user": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "volume": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "rbd": {
+          "type": "RBDPersistentVolumeSource",
+          "required": false,
+          "fields": {
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "image": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "keyring": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "monitors": {
+              "type": "[]string",
+              "required": true,
+              "fields": {}
+            },
+            "pool": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "secretRef": {
+              "type": "SecretReference",
+              "required": false,
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "namespace": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            },
+            "user": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "scaleIO": {
+          "type": "ScaleIOPersistentVolumeSource",
+          "required": false,
+          "fields": {
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "gateway": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "protectionDomain": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "secretRef": {
+              "type": "SecretReference",
+              "required": true,
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "namespace": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            },
+            "sslEnabled": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "storageMode": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "storagePool": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "system": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "volumeName": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "storageClassName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "storageos": {
+          "type": "StorageOSPersistentVolumeSource",
+          "required": false,
+          "fields": {
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "readOnly": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "secretRef": {
+              "type": "ObjectReference",
+              "required": false,
+              "fields": {
+                "apiVersion": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "fieldPath": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "kind": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "name": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "namespace": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "resourceVersion": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "uid": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            },
+            "volumeName": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "volumeNamespace": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "volumeAttributesClassName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "volumeMode": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "vsphereVolume": {
+          "type": "VsphereVirtualDiskVolumeSource",
+          "required": false,
+          "fields": {
+            "fsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "storagePolicyID": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "storagePolicyName": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "volumePath": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "PersistentVolumeStatus",
+      "required": false,
+      "fields": {
+        "lastPhaseTransitionTime": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "message": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "phase": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "enum:": {
+          "type": "",
+          "required": false,
+          "enum": [
+            "Available",
+            "Bound",
+            "Failed",
+            "Pending"
+          ],
+          "fields": {}
+        },
+        "reason": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    }
+  }
+}

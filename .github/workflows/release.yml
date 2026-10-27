@@ -1,0 +1,360 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run in dry-run mode (build & verify all artifacts without publishing to registries)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write   # Create GitHub Release and upload binary assets
+  id-token: write   # Trusted publishing (OIDC) for PyPI and npm provenance
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1. Run full lint & test suite before building or publishing
+  # ─────────────────────────────────────────────────────────────────────────────
+  test:
+    name: Lint & Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run workspace tests
+        run: cargo test --workspace
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2. Build standalone native Rust binaries for each OS / architecture
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-binaries:
+    name: Build Binary — ${{ matrix.target }}
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            rust_target: x86_64-unknown-linux-gnu
+            bin: yamlly
+
+          - os: macos-13
+            target: darwin-x64
+            rust_target: x86_64-apple-darwin
+            bin: yamlly
+
+          - os: macos-latest
+            target: darwin-arm64
+            rust_target: aarch64-apple-darwin
+            bin: yamlly
+
+          - os: windows-latest
+            target: win32-x64
+            rust_target: x86_64-pc-windows-msvc
+            bin: yamlly.exe
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.rust_target }}
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.rust_target }} -p yamlly
+
+      - name: Smoke-test binary (--version and --list)
+        shell: bash
+        run: |
+          BIN="target/${{ matrix.rust_target }}/release/${{ matrix.bin }}"
+          "$BIN" --version
+          "$BIN" --list | head -n 5
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yamlly-${{ matrix.target }}
+          path: target/${{ matrix.rust_target }}/release/${{ matrix.bin }}
+          if-no-files-found: error
+          retention-days: 5
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 3. Create GitHub Release and attach standalone binaries + SHA256 checksums
+  # ─────────────────────────────────────────────────────────────────────────────
+  github-release:
+    name: GitHub Release
+    needs: build-binaries
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Prepare release assets & SHA256SUMS
+        run: |
+          mkdir -p release
+          cp artifacts/yamlly-linux-x64/yamlly       release/yamlly-linux-x64
+          cp artifacts/yamlly-darwin-x64/yamlly      release/yamlly-darwin-x64
+          cp artifacts/yamlly-darwin-arm64/yamlly    release/yamlly-darwin-arm64
+          cp artifacts/yamlly-win32-x64/yamlly.exe   release/yamlly-win32-x64.exe
+          chmod +x release/yamlly-linux-x64 release/yamlly-darwin-x64 release/yamlly-darwin-arm64
+          (cd release && sha256sum * > SHA256SUMS.txt)
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release/*
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 4. Publish to crates.io (yamlly-core first, then yamlly)
+  # ─────────────────────────────────────────────────────────────────────────────
+  publish-crates:
+    name: Publish to crates.io
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Dry-run package verification
+        if: ${{ inputs.dry_run == true || env.CARGO_REGISTRY_TOKEN == '' }}
+        run: |
+          echo "Running crates.io packaging verification (dry-run)..."
+          cargo publish -p yamlly-core --dry-run --allow-dirty
+          cargo package -p yamlly --list --allow-dirty
+
+      - name: Publish yamlly-core to crates.io
+        if: ${{ inputs.dry_run != true && env.CARGO_REGISTRY_TOKEN != '' }}
+        run: cargo publish -p yamlly-core
+
+      - name: Publish yamlly to crates.io
+        if: ${{ inputs.dry_run != true && env.CARGO_REGISTRY_TOKEN != '' }}
+        run: cargo publish -p yamlly
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 5. Build Python wheels + sdist with maturin and publish to PyPI
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-pypi-wheels:
+    name: Build PyPI Wheel — ${{ matrix.target }}
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64
+            manylinux: auto
+          - os: macos-13
+            target: x86_64
+            manylinux: ""
+          - os: macos-latest
+            target: aarch64
+            manylinux: ""
+          - os: windows-latest
+            target: x64
+            manylinux: ""
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build wheel with maturin
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          sccache: "true"
+          manylinux: ${{ matrix.manylinux }}
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypi-wheels-${{ matrix.os }}-${{ matrix.target }}
+          path: dist/*.whl
+          if-no-files-found: error
+          retention-days: 5
+
+  build-pypi-sdist:
+    name: Build PyPI Source Distribution (sdist)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build sdist with maturin
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+
+      - name: Upload sdist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypi-sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 5
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build-pypi-wheels, build-pypi-sdist]
+    if: ${{ inputs.dry_run != true }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - name: Download all PyPI distributions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pypi-*
+          path: dist
+          merge-multiple: true
+
+      - name: List PyPI artifacts
+        run: ls -lh dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 6. Stage platform binaries and publish to npm
+  # ─────────────────────────────────────────────────────────────────────────────
+  publish-npm:
+    name: Publish to npm
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Download all binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: yamlly-*
+          path: artifacts/
+
+      - name: Stage binaries into npm platform packages
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.0.1"
+          fi
+          echo "Staging npm packages for version ${VERSION}..."
+
+          stage() {
+            local target="$1" bin="$2"
+            local pkg_dir="npm-package/npm/yamlly-${target}-bin"
+            mkdir -p "${pkg_dir}/bin"
+            cp "artifacts/yamlly-${target}/${bin}" "${pkg_dir}/bin/${bin}"
+            chmod +x "${pkg_dir}/bin/${bin}" 2>/dev/null || true
+            node -e "
+              const fs = require('fs');
+              const p = '${pkg_dir}/package.json';
+              const j = JSON.parse(fs.readFileSync(p, 'utf8'));
+              j.version = '${VERSION}';
+              fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');
+            "
+          }
+
+          stage linux-x64    yamlly
+          stage darwin-x64   yamlly
+          stage darwin-arm64 yamlly
+          stage win32-x64    yamlly.exe
+
+          node -e "
+            const fs = require('fs');
+            const p = 'npm-package/package.json';
+            const j = JSON.parse(fs.readFileSync(p, 'utf8'));
+            j.version = '${VERSION}';
+            for (const k of Object.keys(j.optionalDependencies || {})) {
+              j.optionalDependencies[k] = '${VERSION}';
+            }
+            fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');
+          "
+
+      - name: Dry-run npm publish
+        if: ${{ inputs.dry_run == true || env.NODE_AUTH_TOKEN == '' }}
+        run: |
+          for pkg in npm-package/npm/yamlly-*/; do
+            echo "Dry-run packing $pkg ..."
+            npm pack "./$pkg" --dry-run
+          done
+          chmod +x npm-package/bin/yamlly.js
+          npm pack ./npm-package --dry-run
+
+      - name: Publish platform packages to npm
+        if: ${{ inputs.dry_run != true && env.NODE_AUTH_TOKEN != '' }}
+        run: |
+          for pkg in npm-package/npm/yamlly-*/; do
+            echo "Publishing $pkg ..."
+            cd "$pkg"
+            npm publish --access public
+            cd "$GITHUB_WORKSPACE"
+          done
+
+      - name: Publish main package to npm
+        if: ${{ inputs.dry_run != true && env.NODE_AUTH_TOKEN != '' }}
+        run: |
+          cd npm-package
+          chmod +x bin/yamlly.js
+          npm publish --access public

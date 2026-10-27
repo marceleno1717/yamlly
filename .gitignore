@@ -1,0 +1,7 @@
+/target/
+/dist/
+/*.whl
+/*.tar.gz
+/kept-clusterrole.yaml/
+/npm-package/npm/*/bin/yamlly*
+/npm-package/bin/yamlly-bin*

@@ -1,0 +1,1009 @@
+{
+  "kind": "HorizontalPodAutoscaler",
+  "apiVersion": "autoscaling/v2",
+  "resource": "horizontalpodautoscaler",
+  "common_fields": [
+    "metadata.name",
+    "metadata.namespace",
+    "spec.scaleTargetRef.apiVersion",
+    "spec.scaleTargetRef.kind",
+    "spec.scaleTargetRef.name",
+    "spec.minReplicas",
+    "spec.maxReplicas",
+    "spec.metrics[].type",
+    "spec.metrics[].resource.name",
+    "spec.metrics[].resource.target.type",
+    "spec.metrics[].resource.target.averageUtilization"
+  ],
+  "fields": {
+    "apiVersion": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "kind": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "metadata": {
+      "type": "ObjectMeta",
+      "required": false,
+      "fields": {
+        "annotations": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "deletionGracePeriodSeconds": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "deletionTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "finalizers": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "generateName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "generation": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "labels": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "managedFields": {
+          "type": "[]ManagedFieldsEntry",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsV1": {
+              "type": "FieldsV1",
+              "required": false,
+              "fields": {}
+            },
+            "manager": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "operation": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "subresource": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "time": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "namespace": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "ownerReferences": {
+          "type": "[]OwnerReference",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "blockOwnerDeletion": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "controller": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "kind": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "uid": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "resourceVersion": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "selfLink": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "uid": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    },
+    "spec": {
+      "type": "HorizontalPodAutoscalerSpec",
+      "required": false,
+      "fields": {
+        "behavior": {
+          "type": "HorizontalPodAutoscalerBehavior",
+          "required": false,
+          "fields": {
+            "scaleDown": {
+              "type": "HPAScalingRules",
+              "required": false,
+              "fields": {
+                "policies": {
+                  "type": "[]HPAScalingPolicy",
+                  "required": false,
+                  "fields": {
+                    "periodSeconds": {
+                      "type": "integer",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "type": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "value": {
+                      "type": "integer",
+                      "required": true,
+                      "fields": {}
+                    }
+                  }
+                },
+                "selectPolicy": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "stabilizationWindowSeconds": {
+                  "type": "integer",
+                  "required": false,
+                  "fields": {}
+                },
+                "tolerance": {
+                  "type": "Quantity",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            },
+            "scaleUp": {
+              "type": "HPAScalingRules",
+              "required": false,
+              "fields": {
+                "policies": {
+                  "type": "[]HPAScalingPolicy",
+                  "required": false,
+                  "fields": {
+                    "periodSeconds": {
+                      "type": "integer",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "type": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "value": {
+                      "type": "integer",
+                      "required": true,
+                      "fields": {}
+                    }
+                  }
+                },
+                "selectPolicy": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "stabilizationWindowSeconds": {
+                  "type": "integer",
+                  "required": false,
+                  "fields": {}
+                },
+                "tolerance": {
+                  "type": "Quantity",
+                  "required": false,
+                  "fields": {}
+                }
+              }
+            }
+          }
+        },
+        "maxReplicas": {
+          "type": "integer",
+          "required": true,
+          "fields": {}
+        },
+        "metrics": {
+          "type": "[]MetricSpec",
+          "required": false,
+          "fields": {
+            "containerResource": {
+              "type": "ContainerResourceMetricSource",
+              "required": false,
+              "fields": {
+                "container": {
+                  "type": "string",
+                  "required": true,
+                  "fields": {}
+                },
+                "name": {
+                  "type": "string",
+                  "required": true,
+                  "fields": {}
+                },
+                "target": {
+                  "type": "MetricTarget",
+                  "required": true,
+                  "fields": {
+                    "averageUtilization": {
+                      "type": "integer",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "averageValue": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "type": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "value": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    }
+                  }
+                }
+              }
+            },
+            "external": {
+              "type": "ExternalMetricSource",
+              "required": false,
+              "fields": {
+                "metric": {
+                  "type": "MetricIdentifier",
+                  "required": true,
+                  "fields": {
+                    "name": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "selector": {
+                      "type": "LabelSelector",
+                      "required": false,
+                      "fields": {
+                        "matchExpressions": {
+                          "type": "[]LabelSelectorRequirement",
+                          "required": false,
+                          "fields": {
+                            "key": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "operator": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "values": {
+                              "type": "[]string",
+                              "required": false,
+                              "fields": {}
+                            }
+                          }
+                        },
+                        "matchLabels": {
+                          "type": "map[string]string",
+                          "required": false,
+                          "fields": {}
+                        }
+                      }
+                    }
+                  }
+                },
+                "target": {
+                  "type": "MetricTarget",
+                  "required": true,
+                  "fields": {
+                    "averageUtilization": {
+                      "type": "integer",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "averageValue": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "type": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "value": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    }
+                  }
+                }
+              }
+            },
+            "object": {
+              "type": "ObjectMetricSource",
+              "required": false,
+              "fields": {
+                "describedObject": {
+                  "type": "CrossVersionObjectReference",
+                  "required": true,
+                  "fields": {
+                    "apiVersion": {
+                      "type": "string",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "kind": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "name": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    }
+                  }
+                },
+                "metric": {
+                  "type": "MetricIdentifier",
+                  "required": true,
+                  "fields": {
+                    "name": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "selector": {
+                      "type": "LabelSelector",
+                      "required": false,
+                      "fields": {
+                        "matchExpressions": {
+                          "type": "[]LabelSelectorRequirement",
+                          "required": false,
+                          "fields": {
+                            "key": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "operator": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "values": {
+                              "type": "[]string",
+                              "required": false,
+                              "fields": {}
+                            }
+                          }
+                        },
+                        "matchLabels": {
+                          "type": "map[string]string",
+                          "required": false,
+                          "fields": {}
+                        }
+                      }
+                    }
+                  }
+                },
+                "target": {
+                  "type": "MetricTarget",
+                  "required": true,
+                  "fields": {
+                    "averageUtilization": {
+                      "type": "integer",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "averageValue": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "type": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "value": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    }
+                  }
+                }
+              }
+            },
+            "pods": {
+              "type": "PodsMetricSource",
+              "required": false,
+              "fields": {
+                "metric": {
+                  "type": "MetricIdentifier",
+                  "required": true,
+                  "fields": {
+                    "name": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "selector": {
+                      "type": "LabelSelector",
+                      "required": false,
+                      "fields": {
+                        "matchExpressions": {
+                          "type": "[]LabelSelectorRequirement",
+                          "required": false,
+                          "fields": {
+                            "key": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "operator": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "values": {
+                              "type": "[]string",
+                              "required": false,
+                              "fields": {}
+                            }
+                          }
+                        },
+                        "matchLabels": {
+                          "type": "map[string]string",
+                          "required": false,
+                          "fields": {}
+                        }
+                      }
+                    }
+                  }
+                },
+                "target": {
+                  "type": "MetricTarget",
+                  "required": true,
+                  "fields": {
+                    "averageUtilization": {
+                      "type": "integer",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "averageValue": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "type": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "value": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    }
+                  }
+                }
+              }
+            },
+            "resource": {
+              "type": "ResourceMetricSource",
+              "required": false,
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "required": true,
+                  "fields": {}
+                },
+                "target": {
+                  "type": "MetricTarget",
+                  "required": true,
+                  "fields": {
+                    "averageUtilization": {
+                      "type": "integer",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "averageValue": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "type": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "value": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    }
+                  }
+                }
+              }
+            },
+            "type": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "minReplicas": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "scaleTargetRef": {
+          "type": "CrossVersionObjectReference",
+          "required": true,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "kind": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "HorizontalPodAutoscalerStatus",
+      "required": false,
+      "fields": {
+        "conditions": {
+          "type": "[]HorizontalPodAutoscalerCondition",
+          "required": false,
+          "fields": {
+            "lastTransitionTime": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "message": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "reason": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "status": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "type": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "currentMetrics": {
+          "type": "[]MetricStatus",
+          "required": false,
+          "fields": {
+            "containerResource": {
+              "type": "ContainerResourceMetricStatus",
+              "required": false,
+              "fields": {
+                "container": {
+                  "type": "string",
+                  "required": true,
+                  "fields": {}
+                },
+                "current": {
+                  "type": "MetricValueStatus",
+                  "required": true,
+                  "fields": {
+                    "averageUtilization": {
+                      "type": "integer",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "averageValue": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "value": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    }
+                  }
+                },
+                "name": {
+                  "type": "string",
+                  "required": true,
+                  "fields": {}
+                }
+              }
+            },
+            "external": {
+              "type": "ExternalMetricStatus",
+              "required": false,
+              "fields": {
+                "current": {
+                  "type": "MetricValueStatus",
+                  "required": true,
+                  "fields": {
+                    "averageUtilization": {
+                      "type": "integer",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "averageValue": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "value": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    }
+                  }
+                },
+                "metric": {
+                  "type": "MetricIdentifier",
+                  "required": true,
+                  "fields": {
+                    "name": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "selector": {
+                      "type": "LabelSelector",
+                      "required": false,
+                      "fields": {
+                        "matchExpressions": {
+                          "type": "[]LabelSelectorRequirement",
+                          "required": false,
+                          "fields": {
+                            "key": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "operator": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "values": {
+                              "type": "[]string",
+                              "required": false,
+                              "fields": {}
+                            }
+                          }
+                        },
+                        "matchLabels": {
+                          "type": "map[string]string",
+                          "required": false,
+                          "fields": {}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "object": {
+              "type": "ObjectMetricStatus",
+              "required": false,
+              "fields": {
+                "current": {
+                  "type": "MetricValueStatus",
+                  "required": true,
+                  "fields": {
+                    "averageUtilization": {
+                      "type": "integer",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "averageValue": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "value": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    }
+                  }
+                },
+                "describedObject": {
+                  "type": "CrossVersionObjectReference",
+                  "required": true,
+                  "fields": {
+                    "apiVersion": {
+                      "type": "string",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "kind": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "name": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    }
+                  }
+                },
+                "metric": {
+                  "type": "MetricIdentifier",
+                  "required": true,
+                  "fields": {
+                    "name": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "selector": {
+                      "type": "LabelSelector",
+                      "required": false,
+                      "fields": {
+                        "matchExpressions": {
+                          "type": "[]LabelSelectorRequirement",
+                          "required": false,
+                          "fields": {
+                            "key": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "operator": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "values": {
+                              "type": "[]string",
+                              "required": false,
+                              "fields": {}
+                            }
+                          }
+                        },
+                        "matchLabels": {
+                          "type": "map[string]string",
+                          "required": false,
+                          "fields": {}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "pods": {
+              "type": "PodsMetricStatus",
+              "required": false,
+              "fields": {
+                "current": {
+                  "type": "MetricValueStatus",
+                  "required": true,
+                  "fields": {
+                    "averageUtilization": {
+                      "type": "integer",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "averageValue": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "value": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    }
+                  }
+                },
+                "metric": {
+                  "type": "MetricIdentifier",
+                  "required": true,
+                  "fields": {
+                    "name": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "selector": {
+                      "type": "LabelSelector",
+                      "required": false,
+                      "fields": {
+                        "matchExpressions": {
+                          "type": "[]LabelSelectorRequirement",
+                          "required": false,
+                          "fields": {
+                            "key": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "operator": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "values": {
+                              "type": "[]string",
+                              "required": false,
+                              "fields": {}
+                            }
+                          }
+                        },
+                        "matchLabels": {
+                          "type": "map[string]string",
+                          "required": false,
+                          "fields": {}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "resource": {
+              "type": "ResourceMetricStatus",
+              "required": false,
+              "fields": {
+                "current": {
+                  "type": "MetricValueStatus",
+                  "required": true,
+                  "fields": {
+                    "averageUtilization": {
+                      "type": "integer",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "averageValue": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "value": {
+                      "type": "Quantity",
+                      "required": false,
+                      "fields": {}
+                    }
+                  }
+                },
+                "name": {
+                  "type": "string",
+                  "required": true,
+                  "fields": {}
+                }
+              }
+            },
+            "type": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "currentReplicas": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "desiredReplicas": {
+          "type": "integer",
+          "required": true,
+          "fields": {}
+        },
+        "lastScaleTime": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "observedGeneration": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        }
+      }
+    }
+  }
+}

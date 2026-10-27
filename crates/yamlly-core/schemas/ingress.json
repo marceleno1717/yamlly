@@ -1,0 +1,416 @@
+{
+  "kind": "Ingress",
+  "apiVersion": "networking.k8s.io/v1",
+  "resource": "ingress",
+  "common_fields": [
+    "metadata.name",
+    "metadata.namespace",
+    "metadata.labels",
+    "metadata.annotations",
+    "spec.ingressClassName",
+    "spec.rules[].host",
+    "spec.rules[].http.paths[].path",
+    "spec.rules[].http.paths[].pathType",
+    "spec.rules[].http.paths[].backend.service.name",
+    "spec.rules[].http.paths[].backend.service.port.number",
+    "spec.tls[].hosts",
+    "spec.tls[].secretName"
+  ],
+  "fields": {
+    "apiVersion": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "kind": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "metadata": {
+      "type": "ObjectMeta",
+      "required": false,
+      "fields": {
+        "annotations": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "deletionGracePeriodSeconds": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "deletionTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "finalizers": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "generateName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "generation": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "labels": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "managedFields": {
+          "type": "[]ManagedFieldsEntry",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsV1": {
+              "type": "FieldsV1",
+              "required": false,
+              "fields": {}
+            },
+            "manager": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "operation": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "subresource": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "time": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "namespace": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "ownerReferences": {
+          "type": "[]OwnerReference",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "blockOwnerDeletion": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "controller": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "kind": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "uid": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "resourceVersion": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "selfLink": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "uid": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    },
+    "spec": {
+      "type": "IngressSpec",
+      "required": false,
+      "fields": {
+        "defaultBackend": {
+          "type": "IngressBackend",
+          "required": false,
+          "fields": {
+            "resource": {
+              "type": "TypedLocalObjectReference",
+              "required": false,
+              "fields": {
+                "apiGroup": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "kind": {
+                  "type": "string",
+                  "required": true,
+                  "fields": {}
+                },
+                "name": {
+                  "type": "string",
+                  "required": true,
+                  "fields": {}
+                }
+              }
+            },
+            "service": {
+              "type": "IngressServiceBackend",
+              "required": false,
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "required": true,
+                  "fields": {}
+                },
+                "port": {
+                  "type": "ServiceBackendPort",
+                  "required": false,
+                  "fields": {
+                    "name": {
+                      "type": "string",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "number": {
+                      "type": "integer",
+                      "required": false,
+                      "fields": {}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ingressClassName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "rules": {
+          "type": "[]IngressRule",
+          "required": false,
+          "fields": {
+            "host": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "http": {
+              "type": "HTTPIngressRuleValue",
+              "required": false,
+              "fields": {
+                "paths": {
+                  "type": "[]HTTPIngressPath",
+                  "required": true,
+                  "fields": {
+                    "backend": {
+                      "type": "IngressBackend",
+                      "required": true,
+                      "fields": {
+                        "resource": {
+                          "type": "TypedLocalObjectReference",
+                          "required": false,
+                          "fields": {
+                            "apiGroup": {
+                              "type": "string",
+                              "required": false,
+                              "fields": {}
+                            },
+                            "kind": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "name": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            }
+                          }
+                        },
+                        "service": {
+                          "type": "IngressServiceBackend",
+                          "required": false,
+                          "fields": {
+                            "name": {
+                              "type": "string",
+                              "required": true,
+                              "fields": {}
+                            },
+                            "port": {
+                              "type": "ServiceBackendPort",
+                              "required": false,
+                              "fields": {
+                                "name": {
+                                  "type": "string",
+                                  "required": false,
+                                  "fields": {}
+                                },
+                                "number": {
+                                  "type": "integer",
+                                  "required": false,
+                                  "fields": {}
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "path": {
+                      "type": "string",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "pathType": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "enum:": {
+                      "type": "",
+                      "required": false,
+                      "enum": [
+                        "Exact",
+                        "ImplementationSpecific",
+                        "Prefix"
+                      ],
+                      "fields": {}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tls": {
+          "type": "[]IngressTLS",
+          "required": false,
+          "fields": {
+            "hosts": {
+              "type": "[]string",
+              "required": false,
+              "fields": {}
+            },
+            "secretName": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "IngressStatus",
+      "required": false,
+      "fields": {
+        "loadBalancer": {
+          "type": "IngressLoadBalancerStatus",
+          "required": false,
+          "fields": {
+            "ingress": {
+              "type": "[]IngressLoadBalancerIngress",
+              "required": false,
+              "fields": {
+                "hostname": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "ip": {
+                  "type": "string",
+                  "required": false,
+                  "fields": {}
+                },
+                "ports": {
+                  "type": "[]IngressPortStatus",
+                  "required": false,
+                  "fields": {
+                    "error": {
+                      "type": "string",
+                      "required": false,
+                      "fields": {}
+                    },
+                    "port": {
+                      "type": "integer",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "protocol": {
+                      "type": "string",
+                      "required": true,
+                      "fields": {}
+                    },
+                    "enum:": {
+                      "type": "",
+                      "required": false,
+                      "enum": [
+                        "SCTP",
+                        "TCP",
+                        "UDP"
+                      ],
+                      "fields": {}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, dev]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint-and-test:
+    name: Lint & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run workspace tests
+        run: cargo test --workspace
+
+  package-check:
+    name: Verify Release Packaging (crates.io, PyPI, npm)
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify crates.io package (yamlly-core)
+        run: cargo package -p yamlly-core --allow-dirty
+
+      - name: Verify crates.io package file list (yamlly)
+        # Uses --list until yamlly-core is published to the crates.io index for the first time
+        run: cargo package -p yamlly --list --allow-dirty
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build PyPI wheel & sdist with maturin
+        run: |
+          pip install maturin
+          maturin build --release --out dist/wheels
+          maturin sdist --out dist/wheels
+          ls -lh dist/wheels
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Verify npm packages (dry-run)
+        run: |
+          for pkg in npm-package/npm/yamlly-*/; do
+            echo "Checking $pkg ..."
+            npm pack "./$pkg" --dry-run
+          done
+          npm pack ./npm-package --dry-run

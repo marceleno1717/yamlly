@@ -1,0 +1,232 @@
+{
+  "kind": "Namespace",
+  "apiVersion": "v1",
+  "resource": "namespace",
+  "common_fields": [
+    "metadata.name",
+    "metadata.labels",
+    "metadata.annotations"
+  ],
+  "fields": {
+    "apiVersion": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "kind": {
+      "type": "string",
+      "required": false,
+      "fields": {}
+    },
+    "metadata": {
+      "type": "ObjectMeta",
+      "required": false,
+      "fields": {
+        "annotations": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "deletionGracePeriodSeconds": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "deletionTimestamp": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "finalizers": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        },
+        "generateName": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "generation": {
+          "type": "integer",
+          "required": false,
+          "fields": {}
+        },
+        "labels": {
+          "type": "map[string]string",
+          "required": false,
+          "fields": {}
+        },
+        "managedFields": {
+          "type": "[]ManagedFieldsEntry",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsType": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "fieldsV1": {
+              "type": "FieldsV1",
+              "required": false,
+              "fields": {}
+            },
+            "manager": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "operation": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "subresource": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "time": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            }
+          }
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "namespace": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "ownerReferences": {
+          "type": "[]OwnerReference",
+          "required": false,
+          "fields": {
+            "apiVersion": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "blockOwnerDeletion": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "controller": {
+              "type": "boolean",
+              "required": false,
+              "fields": {}
+            },
+            "kind": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "uid": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "resourceVersion": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "selfLink": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "uid": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    },
+    "spec": {
+      "type": "NamespaceSpec",
+      "required": false,
+      "fields": {
+        "finalizers": {
+          "type": "[]string",
+          "required": false,
+          "fields": {}
+        }
+      }
+    },
+    "status": {
+      "type": "NamespaceStatus",
+      "required": false,
+      "fields": {
+        "conditions": {
+          "type": "[]NamespaceCondition",
+          "required": false,
+          "fields": {
+            "lastTransitionTime": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "message": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "reason": {
+              "type": "string",
+              "required": false,
+              "fields": {}
+            },
+            "status": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            },
+            "type": {
+              "type": "string",
+              "required": true,
+              "fields": {}
+            }
+          }
+        },
+        "phase": {
+          "type": "string",
+          "required": false,
+          "fields": {}
+        },
+        "enum:": {
+          "type": "",
+          "required": false,
+          "enum": [
+            "Active",
+            "Terminating"
+          ],
+          "fields": {}
+        }
+      }
+    }
+  }
+}
