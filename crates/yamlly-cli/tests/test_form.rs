@@ -881,3 +881,50 @@ fn test_cluster_options_disabled_when_disconnected() {
     let yaml = app.active_yaml().expect("yaml");
     assert!(!app.start_kubectl_op(KubectlOpKind::DryRunServer, yaml));
 }
+
+#[test]
+fn test_reconnect_and_refresh_loads_all_namespaces_and_updates_tabs() {
+    use yamlly::app::Msg;
+
+    let mut app = App::new_test();
+    app.open_resource("Deployment", None);
+    assert_eq!(app.tabs.len(), 1);
+    assert!(
+        app.tabs[0]
+            .form
+            .namespaces
+            .contains(&"production".to_string())
+    );
+
+    // Simulate user creating a new namespace in the cluster: "staging"
+    if let Some(mock) = app.mock_cluster_resources.as_mut()
+        && let Some(ns_items) = mock.get_mut("Namespace")
+    {
+        ns_items.push(serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "name": "staging"
+            }
+        }));
+    }
+
+    // Trigger cluster refresh
+    app.update(Msg::Reconnect);
+
+    // Verify app cluster_namespaces contains the new namespace
+    assert!(app.cluster_namespaces.contains(&"staging".to_string()));
+
+    // Verify existing open tab received the new namespace and was rebuilt
+    assert!(
+        app.tabs[0].form.namespaces.contains(&"staging".to_string()),
+        "open tab must update its namespaces on refresh"
+    );
+
+    // Open a new tab and verify it also has the newly created namespace
+    app.open_resource("Pod", None);
+    assert!(
+        app.tabs[1].form.namespaces.contains(&"staging".to_string()),
+        "new tab must get newly discovered namespace"
+    );
+}

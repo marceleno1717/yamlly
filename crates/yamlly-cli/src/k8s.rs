@@ -191,6 +191,7 @@ pub struct ClusterStatus {
     pub connected: bool,
     pub context_name: Option<String>,
     pub namespace: String,
+    pub namespaces: Vec<String>,
     pub error: Option<String>,
 }
 
@@ -201,6 +202,11 @@ impl Default for ClusterStatus {
             connected: false,
             context_name: None,
             namespace: "default".to_string(),
+            namespaces: vec![
+                "default".to_string(),
+                "kube-system".to_string(),
+                "kube-public".to_string(),
+            ],
             error: None,
         }
     }
@@ -234,6 +240,7 @@ pub fn check_connection() -> ClusterStatus {
             connected: false,
             context_name: None,
             namespace: "default".to_string(),
+            namespaces: vec!["default".to_string()],
             error: Some("No current context".to_string()),
         };
     }
@@ -261,13 +268,21 @@ pub fn check_connection() -> ClusterStatus {
         .output();
 
     match test_output {
-        Ok(out) if out.status.success() => ClusterStatus {
-            is_checking: false,
-            connected: true,
-            context_name,
-            namespace,
-            error: None,
-        },
+        Ok(out) if out.status.success() => {
+            let mut namespaces = get_all_namespaces();
+            if !namespace.is_empty() && !namespaces.contains(&namespace) {
+                namespaces.push(namespace.clone());
+                namespaces.sort();
+            }
+            ClusterStatus {
+                is_checking: false,
+                connected: true,
+                context_name,
+                namespace,
+                namespaces,
+                error: None,
+            }
+        }
         Ok(out) => {
             let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
             ClusterStatus {
@@ -275,6 +290,7 @@ pub fn check_connection() -> ClusterStatus {
                 connected: false,
                 context_name,
                 namespace,
+                namespaces: vec!["default".to_string()],
                 error: Some(err),
             }
         }
@@ -283,6 +299,7 @@ pub fn check_connection() -> ClusterStatus {
             connected: false,
             context_name,
             namespace,
+            namespaces: vec!["default".to_string()],
             error: Some(e.to_string()),
         },
     }
@@ -305,11 +322,18 @@ pub fn get_cluster_resources(kind: &str, namespace: Option<&str>) -> ClusterFetc
         "json".to_string(),
         "--request-timeout=5s".to_string(),
     ];
-    if let Some(ns) = namespace.filter(|s| !s.trim().is_empty()) {
-        args.push("-n".to_string());
-        args.push(ns.to_string());
-    } else {
-        args.push("-A".to_string());
+    let is_cluster_scoped = kind.eq_ignore_ascii_case("namespace")
+        || kind.eq_ignore_ascii_case("node")
+        || kind.eq_ignore_ascii_case("clusterrole")
+        || kind.eq_ignore_ascii_case("clusterrolebinding")
+        || kind.eq_ignore_ascii_case("customresourcedefinition");
+    if !is_cluster_scoped {
+        if let Some(ns) = namespace.filter(|s| !s.trim().is_empty()) {
+            args.push("-n".to_string());
+            args.push(ns.to_string());
+        } else {
+            args.push("-A".to_string());
+        }
     }
 
     match Command::new("kubectl").args(&args).output() {

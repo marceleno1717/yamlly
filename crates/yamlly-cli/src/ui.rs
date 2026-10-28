@@ -233,7 +233,11 @@ fn declare_header(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
     let cluster = ctx.state().cluster_status.clone();
     let theme_name = ctx.state().theme().name;
     let theme_label = format!("◐ {theme_name}");
-    let reconnect_label = "⟳ Reconnect";
+    let reconnect_label = if cluster.connected {
+        "⟳ Refresh"
+    } else {
+        "⟳ Reconnect"
+    };
 
     let context_label = if area.width >= 130 {
         let raw_ctx_name = cluster.context_name.as_deref().unwrap_or("Context");
@@ -701,6 +705,25 @@ fn declare_empty_workspace(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
                     .on_press(|| Msg::OpenClusterImportManifest),
                 rect,
             );
+            x = x.saturating_add(import_w).saturating_add(2);
+        }
+
+        let refresh_label = "⟳ Refresh Cluster";
+        let refresh_w = (refresh_label.chars().count() as u16).saturating_add(4);
+        if x.saturating_add(refresh_w) > area.right() {
+            x = area.x.saturating_add(2);
+            y = y.saturating_add(btn_h).saturating_add(1);
+        }
+        if y.saturating_add(btn_h) <= area.bottom() {
+            let rect = Rect::new(x, y, refresh_w, btn_h);
+            ctx.component(
+                "quick-refresh-cluster",
+                Button::new(refresh_label)
+                    .outline()
+                    .size(btn_size)
+                    .on_press(|| Msg::Reconnect),
+                rect,
+            );
         }
     }
 }
@@ -853,21 +876,24 @@ fn declare_toolbar(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect, btn_size: But
         .filter(|r| matches!(r.kind, Row::Field { .. }))
         .count();
 
+    let btn_refresh_label = "⟳ Refresh";
     let btn_import_label = "↓ Import";
     let btn_fields_label = "+ Fields";
     let btn_validate_label = "✓ Validate";
     let btn_preview_label = "⎙ Preview & Save";
 
+    let w_refresh = (btn_refresh_label.chars().count() as u16).saturating_add(4);
     let w_import = (btn_import_label.chars().count() as u16).saturating_add(4);
     let w_fields = (btn_fields_label.chars().count() as u16).saturating_add(4);
     let w_validate = (btn_validate_label.chars().count() as u16).saturating_add(4);
     let w_preview = (btn_preview_label.chars().count() as u16).saturating_add(4);
     let btn_gap = 2u16;
-    let total_btns = w_import
+    let total_btns = w_refresh
+        .saturating_add(w_import)
         .saturating_add(w_fields)
         .saturating_add(w_validate)
         .saturating_add(w_preview)
-        .saturating_add(btn_gap * 3);
+        .saturating_add(btn_gap * 4);
 
     let text_max_w = if area.width > total_btns.saturating_add(10) {
         area.width.saturating_sub(total_btns.saturating_add(2))
@@ -896,9 +922,15 @@ fn declare_toolbar(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect, btn_size: But
     if area.width > total_btns.saturating_add(10) {
         let btn_h = btn_size.height();
         let start_x = area.right().saturating_sub(total_btns);
-        let r_import = Rect::new(start_x, area.y, w_import, btn_h);
+        let r_refresh = Rect::new(start_x, area.y, w_refresh, btn_h);
+        let r_import = Rect::new(
+            r_refresh.right().saturating_add(btn_gap),
+            area.y,
+            w_import,
+            btn_h,
+        );
         let r_fields = Rect::new(
-            start_x.saturating_add(w_import).saturating_add(btn_gap),
+            r_import.right().saturating_add(btn_gap),
             area.y,
             w_fields,
             btn_h,
@@ -914,6 +946,15 @@ fn declare_toolbar(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect, btn_size: But
             area.y,
             w_preview,
             btn_h,
+        );
+
+        ctx.component(
+            "btn-refresh-cluster",
+            Button::new(btn_refresh_label)
+                .outline()
+                .size(btn_size)
+                .on_press(|| Msg::Reconnect),
+            r_refresh,
         );
 
         let is_connected = ctx.state().cluster_status.connected;
@@ -1487,6 +1528,7 @@ enum FooterAction {
     NextResource,
     OpenSelectedResource,
     SwitchPane,
+    RefreshCluster,
 }
 
 fn footer_items(
@@ -1502,13 +1544,14 @@ fn footer_items(
         ]
     } else if has_tab {
         &[
-            ("Tab/↑↓", "Fields", FooterAction::NextField),
+            ("Tab", "Fields", FooterAction::NextField),
             ("/", "Filter", FooterAction::FocusSidebarFilter),
-            ("+/^F", "Add Fields", FooterAction::OpenFieldPicker),
+            ("+", "Add Field", FooterAction::OpenFieldPicker),
             ("^D", "Remove", FooterAction::RemoveFocusedField),
+            ("r", "Refresh", FooterAction::RefreshCluster),
             ("c", "Context", FooterAction::OpenContextSwitcher),
             ("^V", "Validate", FooterAction::ValidateForm),
-            ("p/^S", "Preview & Save", FooterAction::OpenPreview),
+            ("p", "Preview & Save", FooterAction::OpenPreview),
             ("^W", "Close", FooterAction::CloseActiveTab),
             ("t", "Theme", FooterAction::CycleTheme),
             ("q", "Quit", FooterAction::RequestQuit),
@@ -1519,6 +1562,7 @@ fn footer_items(
             ("Enter", "Open Resource", FooterAction::OpenSelectedResource),
             ("/", "Filter Kinds", FooterAction::FocusSidebarFilter),
             ("c / ^K", "Context", FooterAction::OpenContextSwitcher),
+            ("r", "Refresh", FooterAction::RefreshCluster),
             ("Tab", "Switch Pane", FooterAction::SwitchPane),
             ("t", "Theme", FooterAction::CycleTheme),
             ("q", "Quit", FooterAction::RequestQuit),
@@ -1591,6 +1635,7 @@ fn trigger_footer_action(ratcn: &mut Ratcn<App, Msg>, app: &mut App, action: Foo
         FooterAction::OpenPreview => app.update(Msg::OpenPreview),
         FooterAction::CloseActiveTab => app.update(Msg::CloseActiveTab),
         FooterAction::CycleTheme => app.update(Msg::CycleTheme),
+        FooterAction::RefreshCluster => app.update(Msg::Reconnect),
         FooterAction::RequestQuit => app.update(Msg::RequestQuit),
         FooterAction::NextResource => {
             app.select_next_resource();
@@ -2350,12 +2395,12 @@ fn declare_cluster_import_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                 .pointer("/metadata/name")
                 .and_then(|v| v.as_str())
                 .unwrap_or("unnamed");
-            let ns = item
-                .pointer("/metadata/namespace")
-                .and_then(|v| v.as_str())
-                .unwrap_or("default");
+            let ns = item.pointer("/metadata/namespace").and_then(|v| v.as_str());
             let id = i.to_string();
-            let label = format!("{ns}/{name}");
+            let label = match ns {
+                Some(ns) if !ns.is_empty() => format!("{ns}/{name}"),
+                _ => name.to_string(),
+            };
             let extracted = extract_map_from_cluster_item(item, &target_path);
             let summary = if extracted.is_empty() {
                 "(no labels)".to_string()

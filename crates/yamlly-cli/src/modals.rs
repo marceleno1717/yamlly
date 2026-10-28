@@ -980,6 +980,7 @@ impl ClusterImportModalState {
         "Deployment",
         "Pod",
         "Service",
+        "Namespace",
         "StatefulSet",
         "DaemonSet",
         "ConfigMap",

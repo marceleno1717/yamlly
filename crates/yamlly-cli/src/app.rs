@@ -134,6 +134,7 @@ pub struct App {
     pub selected_resource_idx: usize,
     pub focused_resource_kind: Option<String>,
     pub cluster_status: ClusterStatus,
+    pub cluster_namespaces: Vec<String>,
     pub cluster_rx: Option<Receiver<ClusterStatus>>,
     pub cluster_fetch_rx: Option<Receiver<ClusterFetchResult>>,
     pub kubectl_op_rx: Option<Receiver<KubectlOpResult>>,
@@ -192,6 +193,11 @@ impl App {
             selected_resource_idx: 0,
             focused_resource_kind,
             cluster_status: ClusterStatus::default(),
+            cluster_namespaces: vec![
+                "default".to_string(),
+                "kube-system".to_string(),
+                "kube-public".to_string(),
+            ],
             cluster_rx: Some(rx),
             cluster_fetch_rx: None,
             kubectl_op_rx: None,
@@ -394,6 +400,32 @@ impl App {
                 }
             })],
         );
+        mock.insert(
+            "Namespace".to_string(),
+            vec![
+                serde_json::json!({
+                    "apiVersion": "v1",
+                    "kind": "Namespace",
+                    "metadata": {
+                        "name": "default"
+                    }
+                }),
+                serde_json::json!({
+                    "apiVersion": "v1",
+                    "kind": "Namespace",
+                    "metadata": {
+                        "name": "kube-system"
+                    }
+                }),
+                serde_json::json!({
+                    "apiVersion": "v1",
+                    "kind": "Namespace",
+                    "metadata": {
+                        "name": "production"
+                    }
+                }),
+            ],
+        );
 
         Self {
             running: true,
@@ -414,8 +446,18 @@ impl App {
                 connected: true,
                 context_name: Some("test-cluster".to_string()),
                 namespace: "default".to_string(),
+                namespaces: vec![
+                    "default".to_string(),
+                    "kube-system".to_string(),
+                    "production".to_string(),
+                ],
                 error: None,
             },
+            cluster_namespaces: vec![
+                "default".to_string(),
+                "kube-system".to_string(),
+                "production".to_string(),
+            ],
             cluster_rx: None,
             cluster_fetch_rx: None,
             kubectl_op_rx: None,
@@ -487,7 +529,45 @@ impl App {
         if let Some(rx) = &self.cluster_rx
             && let Ok(status) = rx.try_recv()
         {
-            self.cluster_status = status;
+            let was_checking = self.cluster_status.is_checking;
+            let became_connected = status.connected && !self.cluster_status.connected;
+            self.cluster_status = status.clone();
+            if status.connected && !status.namespaces.is_empty() {
+                self.cluster_namespaces = status.namespaces.clone();
+                for tab in &mut self.tabs {
+                    tab.form.namespaces = status.namespaces.clone();
+                    tab.form.rebuild();
+                }
+            }
+            if self.modals.is_open(MODAL_CLUSTER_IMPORT) {
+                let kind = self.cluster_import_modal.selected_kind.clone();
+                self.trigger_cluster_fetch(&kind);
+            }
+            if status.connected && was_checking {
+                if became_connected {
+                    self.notify_kind(
+                        format!(
+                            "Connected to cluster ({} namespaces loaded)",
+                            self.cluster_namespaces.len()
+                        ),
+                        ToastKind::Success,
+                    );
+                } else {
+                    self.notify_kind(
+                        format!(
+                            "✓ Refreshed cluster ({} namespaces loaded)",
+                            self.cluster_namespaces.len()
+                        ),
+                        ToastKind::Success,
+                    );
+                }
+            } else if !status.connected && was_checking {
+                let err_msg = status.error.as_deref().unwrap_or("connection failed");
+                self.notify_kind(
+                    format!("Cluster connection failed: {err_msg}"),
+                    ToastKind::Warning,
+                );
+            }
             self.ui_dirty = true;
         }
         if let Some(rx) = &self.cluster_fetch_rx
@@ -644,9 +724,35 @@ impl App {
     }
 
     pub fn reconnect(&mut self) {
-        if self.mock_cluster_resources.is_some() {
+        if let Some(mock) = &self.mock_cluster_resources {
             self.cluster_status.is_checking = false;
             self.cluster_status.connected = true;
+            if let Some(ns_items) = mock.get("Namespace") {
+                let mut ns_list: Vec<String> = ns_items
+                    .iter()
+                    .filter_map(|item| item.pointer("/metadata/name").and_then(|v| v.as_str()))
+                    .map(|s| s.to_string())
+                    .collect();
+                if !ns_list.is_empty() {
+                    ns_list.sort();
+                    self.cluster_namespaces = ns_list.clone();
+                    for tab in &mut self.tabs {
+                        tab.form.namespaces = ns_list.clone();
+                        tab.form.rebuild();
+                    }
+                }
+            }
+            if self.modals.is_open(MODAL_CLUSTER_IMPORT) {
+                let kind = self.cluster_import_modal.selected_kind.clone();
+                self.trigger_cluster_fetch(&kind);
+            }
+            self.notify_kind(
+                format!(
+                    "✓ Refreshed cluster ({} namespaces loaded)",
+                    self.cluster_namespaces.len()
+                ),
+                ToastKind::Success,
+            );
             self.ui_dirty = true;
             return;
         }
@@ -654,7 +760,14 @@ impl App {
         check_connection_async(tx);
         self.cluster_rx = Some(rx);
         self.cluster_status.is_checking = true;
-        self.notify_kind("Reconnecting to Kubernetes cluster…", ToastKind::Loading);
+        self.notify_kind(
+            if self.cluster_status.connected {
+                "Refreshing cluster resources & namespaces…"
+            } else {
+                "Reconnecting to Kubernetes cluster…"
+            },
+            ToastKind::Loading,
+        );
         self.ui_dirty = true;
     }
 
@@ -735,17 +848,18 @@ impl App {
         *count += 1;
         let default_label = format!("{} {}", kind, *count);
 
-        let namespaces = vec![
-            self.cluster_status.namespace.clone(),
-            "default".to_string(),
-            "kube-system".to_string(),
-            "kube-public".to_string(),
-        ];
-        let mut dedup_ns = Vec::new();
-        for ns in namespaces {
-            if !ns.is_empty() && !dedup_ns.contains(&ns) {
-                dedup_ns.push(ns);
-            }
+        let mut dedup_ns = self.cluster_namespaces.clone();
+        if !self.cluster_status.namespace.is_empty()
+            && !dedup_ns.contains(&self.cluster_status.namespace)
+        {
+            dedup_ns.insert(0, self.cluster_status.namespace.clone());
+        }
+        if dedup_ns.is_empty() {
+            dedup_ns = vec![
+                "default".to_string(),
+                "kube-system".to_string(),
+                "kube-public".to_string(),
+            ];
         }
 
         let mut form = FormState::new(kind, initial_data, dedup_ns);
@@ -1093,11 +1207,24 @@ impl App {
                 self.cluster_status.is_checking = true;
                 self.cluster_status.connected = false;
                 self.reconnect();
-                let ns_list = if self.mock_cluster_resources.is_some() {
-                    vec!["default".to_string(), "kube-system".to_string()]
+                let ns_list = if let Some(mock) = &self.mock_cluster_resources {
+                    if let Some(ns_items) = mock.get("Namespace") {
+                        let mut list: Vec<String> = ns_items
+                            .iter()
+                            .filter_map(|item| {
+                                item.pointer("/metadata/name").and_then(|v| v.as_str())
+                            })
+                            .map(|s| s.to_string())
+                            .collect();
+                        list.sort();
+                        list
+                    } else {
+                        vec!["default".to_string(), "kube-system".to_string()]
+                    }
                 } else {
                     crate::k8s::get_all_namespaces()
                 };
+                self.cluster_namespaces = ns_list.clone();
                 for tab in &mut self.tabs {
                     tab.form.namespaces = ns_list.clone();
                     tab.form.rebuild();
@@ -1640,6 +1767,7 @@ impl App {
                 }
             }
             Msg::ClusterImportRefresh => {
+                self.reconnect();
                 let kind = self.cluster_import_modal.selected_kind.clone();
                 self.trigger_cluster_fetch(&kind);
             }
@@ -1735,6 +1863,10 @@ impl App {
                 }
                 KeyCode::Char('k' | 'K') => {
                     self.update(Msg::OpenContextSwitcher);
+                    return true;
+                }
+                KeyCode::Char('r' | 'R') => {
+                    self.update(Msg::Reconnect);
                     return true;
                 }
                 KeyCode::Char('d' | 'D') => {
@@ -1930,6 +2062,14 @@ impl App {
                 }
                 KeyCode::Char('c') => {
                     self.update(Msg::OpenContextSwitcher);
+                    return true;
+                }
+                KeyCode::Char('r') => {
+                    self.update(Msg::Reconnect);
+                    return true;
+                }
+                KeyCode::F(5) => {
+                    self.update(Msg::Reconnect);
                     return true;
                 }
                 KeyCode::Char('/') => {

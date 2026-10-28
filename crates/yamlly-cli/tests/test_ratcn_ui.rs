@@ -1402,3 +1402,46 @@ fn test_preview_modal_dry_run_disabled_when_disconnected() {
         );
     }
 }
+
+#[test]
+fn test_refresh_button_ui_and_namespace_import() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+
+    // 1. When connected, header displays "⟳ Refresh"
+    let screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(
+        screen.contains("⟳ Refresh"),
+        "header must display '⟳ Refresh' when connected:\n{screen}"
+    );
+
+    // 2. When disconnected, header displays "⟳ Reconnect"
+    app.cluster_status.connected = false;
+    let dc_screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(
+        dc_screen.contains("⟳ Reconnect"),
+        "header must display '⟳ Reconnect' when disconnected:\n{dc_screen}"
+    );
+    app.cluster_status.connected = true;
+
+    // 3. Workspace toolbar displays "⟳ Refresh" next to "↓ Import"
+    app.open_resource("Deployment", None);
+    let ws_screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(
+        ws_screen.contains("⟳ Refresh") && ws_screen.contains("↓ Import"),
+        "workspace action bar must display '⟳ Refresh':\n{ws_screen}"
+    );
+
+    // 4. ClusterImportModal includes "Namespace" tab and lists cluster namespaces
+    app.update(Msg::OpenClusterImportManifest);
+    app.update(Msg::ClusterImportKindSelected("Namespace".to_string()));
+    let ci_screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(
+        ci_screen.contains("Namespace"),
+        "ClusterImportModal must render Namespace tab:\n{ci_screen}"
+    );
+    assert!(
+        ci_screen.contains("production"),
+        "ClusterImportModal must list production namespace:\n{ci_screen}"
+    );
+}
