@@ -1,6 +1,6 @@
 [package]
 name = "yamlly-core"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 description = "Core schema loader, form tree builder, state engine, and YAML emitter for yamlly"
 license-file = "LICENSE"

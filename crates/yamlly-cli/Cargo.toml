@@ -1,6 +1,6 @@
 [package]
 name = "yamlly-cli"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 description = "yamlly — An interactive terminal UI (TUI) for building and editing Kubernetes YAML manifests"
 license-file = "LICENSE"
@@ -21,10 +21,10 @@ path = "src/main.rs"
 
 [[bin]]
 name = "ymly"
-path = "src/main.rs"
+path = "src/bin/ymly.rs"
 
 [dependencies]
-yamlly-core = { version = "0.0.1", path = "../yamlly-core" }
+yamlly-core = { version = "0.0.2", path = "../yamlly-core" }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 ratcn = { version = "0.0.6", features = ["crossterm"] }
 ratatui = { version = "0.30.2", default-features = false, features = ["layout-cache", "std", "crossterm"] }
