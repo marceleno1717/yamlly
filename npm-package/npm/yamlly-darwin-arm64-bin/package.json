@@ -1,6 +1,6 @@
 {
   "name": "@yamlly-cli/darwin-arm64-bin",
-  "version": "0.0.3",
+  "version": "1.0.0",
   "description": "yamlly pre-built native binary for darwin-arm64",
   "license": "PolyForm-Noncommercial-1.0.0",
   "os": [
