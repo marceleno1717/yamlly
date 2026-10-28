@@ -12,7 +12,7 @@ use crate::form::FormState;
 use crate::k8s::{
     ClusterFetchResult, ClusterStatus, KubectlOpKind, KubectlOpResult, check_connection_async,
     clean_cluster_manifest, extract_map_from_cluster_item, fetch_cluster_resources_async,
-    run_kubectl_stdin_async,
+    resolve_manifest_namespace, run_kubectl_stdin_async,
 };
 use crate::modals::{
     ClusterImportModalState, ConfirmKind, ConfirmModalState, ContextSwitcherModalState,
@@ -655,7 +655,7 @@ impl App {
         }
 
         let context = self.cluster_status.context_name.clone();
-        let namespace = Some(self.cluster_status.namespace.clone());
+        let namespace = resolve_manifest_namespace(&yaml, Some(&self.cluster_status.namespace));
         run_kubectl_stdin_async(op, yaml, context, namespace, tx);
         true
     }
@@ -853,6 +853,25 @@ impl App {
             && !dedup_ns.contains(&self.cluster_status.namespace)
         {
             dedup_ns.insert(0, self.cluster_status.namespace.clone());
+        }
+        if let Some(init) = initial_data
+            && let Some(ns) = init
+                .pointer("/metadata/namespace")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+        {
+            if !self
+                .cluster_namespaces
+                .iter()
+                .any(|existing| existing == ns)
+            {
+                self.cluster_namespaces.push(ns.to_string());
+                self.cluster_namespaces.sort();
+            }
+            if !dedup_ns.iter().any(|existing| existing == ns) {
+                dedup_ns.insert(0, ns.to_string());
+            }
         }
         if dedup_ns.is_empty() {
             dedup_ns = vec![

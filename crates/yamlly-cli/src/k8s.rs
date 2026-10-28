@@ -37,6 +37,44 @@ pub struct KubectlOpResult {
     pub stderr: String,
 }
 
+/// Determine the effective Kubernetes namespace for a manifest operation:
+/// 1. If the manifest `kind` is cluster-scoped (`Namespace`, `Node`, `ClusterRole`,
+///    `ClusterRoleBinding`, `CustomResourceDefinition`, `PersistentVolume`, `StorageClass`),
+///    returns `None` (cluster-scoped resources must not pass `-n`).
+/// 2. If the manifest specifies a non-empty `metadata.namespace`, returns that namespace
+///    so `-n <ns>` always matches the object's `metadata.namespace` (preventing
+///    `the namespace from the provided object "<ns>" does not match the namespace "default"`).
+/// 3. Otherwise falls back to `fallback_ns` (typically the active context's default namespace).
+pub fn resolve_manifest_namespace(yaml: &str, fallback_ns: Option<&str>) -> Option<String> {
+    if let Ok(docs) = yamlly_core::parse_yaml_documents(yaml)
+        && let Some(first) = docs.first()
+    {
+        let kind = first.get("kind").and_then(|v| v.as_str()).unwrap_or("");
+        let is_cluster_scoped = kind.eq_ignore_ascii_case("namespace")
+            || kind.eq_ignore_ascii_case("node")
+            || kind.eq_ignore_ascii_case("clusterrole")
+            || kind.eq_ignore_ascii_case("clusterrolebinding")
+            || kind.eq_ignore_ascii_case("customresourcedefinition")
+            || kind.eq_ignore_ascii_case("persistentvolume")
+            || kind.eq_ignore_ascii_case("storageclass");
+        if is_cluster_scoped {
+            return None;
+        }
+        if let Some(manifest_ns) = first
+            .pointer("/metadata/namespace")
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            return Some(manifest_ns.to_string());
+        }
+    }
+    fallback_ns
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
 /// Build the CLI argument list for a stdin-piped `kubectl` manifest operation.
 pub fn build_kubectl_stdin_args(
     op: KubectlOpKind,
@@ -130,7 +168,8 @@ pub fn run_kubectl_stdin(
     context: Option<&str>,
     namespace: Option<&str>,
 ) -> KubectlOpResult {
-    let args = build_kubectl_stdin_args(op, context, namespace);
+    let effective_ns = resolve_manifest_namespace(yaml, namespace);
+    let args = build_kubectl_stdin_args(op, context, effective_ns.as_deref());
     let mut child = match Command::new("kubectl")
         .args(&args)
         .stdin(Stdio::piped())
@@ -830,5 +869,33 @@ mod tests {
         );
         assert!(!dry_err.ok);
         assert!(dry_err.stderr.contains("admission webhook"));
+    }
+
+    #[test]
+    fn test_resolve_manifest_namespace_prefers_object_namespace_and_omits_cluster_scoped() {
+        // 1. Imported Pod in namespace "ivolve" when current context namespace is "default"
+        let pod_yaml = "apiVersion: v1\nkind: Pod\nmetadata:\n  name: web-pod\n  namespace: ivolve\nspec:\n  containers: []\n";
+        assert_eq!(
+            resolve_manifest_namespace(pod_yaml, Some("default")),
+            Some("ivolve".to_string()),
+            "manifest metadata.namespace must override context fallback namespace"
+        );
+
+        // 2. Namespaced resource without metadata.namespace falls back to context namespace
+        let no_ns_yaml =
+            "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web-deploy\nspec: {}\n";
+        assert_eq!(
+            resolve_manifest_namespace(no_ns_yaml, Some("default")),
+            Some("default".to_string()),
+            "missing metadata.namespace must fall back to context namespace"
+        );
+
+        // 3. Cluster-scoped resource (Namespace) omits -n completely
+        let ns_yaml = "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: ivolve\n";
+        assert_eq!(
+            resolve_manifest_namespace(ns_yaml, Some("default")),
+            None,
+            "cluster-scoped resource must not pass -n"
+        );
     }
 }
