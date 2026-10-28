@@ -690,12 +690,14 @@ fn declare_empty_workspace(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
             y = y.saturating_add(btn_h).saturating_add(1);
         }
         if y.saturating_add(btn_h) <= area.bottom() {
+            let is_connected = ctx.state().cluster_status.connected;
             let rect = Rect::new(x, y, import_w, btn_h);
             ctx.component(
                 "quick-import-cluster",
                 Button::new(import_label)
                     .outline()
                     .size(btn_size)
+                    .disabled(!is_connected)
                     .on_press(|| Msg::OpenClusterImportManifest),
                 rect,
             );
@@ -914,11 +916,13 @@ fn declare_toolbar(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect, btn_size: But
             btn_h,
         );
 
+        let is_connected = ctx.state().cluster_status.connected;
         ctx.component(
             "btn-import-cluster",
             Button::new(btn_import_label)
                 .outline()
                 .size(btn_size)
+                .disabled(!is_connected)
                 .on_press(|| Msg::OpenClusterImportManifest),
             r_import,
         );
@@ -1312,12 +1316,16 @@ fn declare_form(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
                                         .on_press(move || Msg::OpenMapEditor(path_open.clone())),
                                     edit_rect,
                                 );
+                                let is_connected = ctx.state().cluster_status.connected;
                                 let path_import = field.path.clone();
                                 ctx.component(
                                     ChildId::from(format!("import-map-{row_idx}")),
-                                    Button::new(import_label).secondary().on_press(move || {
-                                        Msg::OpenClusterImport(path_import.clone())
-                                    }),
+                                    Button::new(import_label)
+                                        .secondary()
+                                        .disabled(!is_connected)
+                                        .on_press(move || {
+                                            Msg::OpenClusterImport(path_import.clone())
+                                        }),
                                     import_rect,
                                 );
                             }
@@ -2042,6 +2050,7 @@ fn declare_dir_picker_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
 // ---------------------------------------------------------------------------
 
 fn declare_map_editor_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
+    let is_connected = ctx.state().cluster_status.connected;
     let me = &ctx.state().map_editor_modal;
     let title = me.title.clone();
     let row_ids: Vec<(usize, ChildId)> = me
@@ -2164,6 +2173,7 @@ fn declare_map_editor_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
             Button::new("↓ Import from Cluster")
                 .outline()
                 .size(ButtonSize::Large)
+                .disabled(!is_connected)
                 .on_press(|| Msg::OpenClusterImportFromMapEditor),
         )
         .action(

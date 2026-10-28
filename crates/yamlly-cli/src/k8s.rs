@@ -1,8 +1,188 @@
-use std::process::Command;
+use std::io::Write;
+use std::process::{Command, Stdio};
 use std::sync::mpsc::Sender;
 use std::thread;
 
 use serde_json::Value;
+
+/// Kind of non-blocking `kubectl` manifest operation piped via `stdin` (`-f -`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KubectlOpKind {
+    /// `kubectl apply --dry-run=server -f -`
+    DryRunServer,
+    /// `kubectl diff -f -`
+    Diff,
+    /// `kubectl apply -f -`
+    Apply,
+}
+
+impl KubectlOpKind {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::DryRunServer => "Server Dry-Run",
+            Self::Diff => "Cluster Diff",
+            Self::Apply => "Cluster Apply",
+        }
+    }
+}
+
+/// Completed result of a background [`KubectlOpKind`] invocation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KubectlOpResult {
+    pub op: KubectlOpKind,
+    pub ok: bool,
+    /// `true` when `kubectl diff` exits with code `0` (manifest is identical to live object).
+    pub no_changes: bool,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+/// Build the CLI argument list for a stdin-piped `kubectl` manifest operation.
+pub fn build_kubectl_stdin_args(
+    op: KubectlOpKind,
+    context: Option<&str>,
+    namespace: Option<&str>,
+) -> Vec<String> {
+    let mut args = Vec::with_capacity(8);
+    if let Some(ctx) = context.map(str::trim).filter(|s| !s.is_empty()) {
+        args.push(format!("--context={ctx}"));
+    }
+    if let Some(ns) = namespace.map(str::trim).filter(|s| !s.is_empty()) {
+        args.push("-n".to_string());
+        args.push(ns.to_string());
+    }
+    match op {
+        KubectlOpKind::DryRunServer => {
+            args.push("apply".to_string());
+            args.push("--dry-run=server".to_string());
+        }
+        KubectlOpKind::Diff => {
+            args.push("diff".to_string());
+        }
+        KubectlOpKind::Apply => {
+            args.push("apply".to_string());
+        }
+    }
+    args.push("--request-timeout=5s".to_string());
+    args.push("-f".to_string());
+    args.push("-".to_string());
+    args
+}
+
+/// Interpret the exit code, stdout, and stderr of a `kubectl` stdin operation.
+///
+/// Specifically handles `kubectl diff` exit codes:
+/// - `0`: no differences (`ok = true, no_changes = true`)
+/// - `1`: differences found (`ok = true, no_changes = false`)
+/// - `> 1` or `None`: error (`ok = false`)
+pub fn interpret_kubectl_output(
+    op: KubectlOpKind,
+    exit_code: Option<i32>,
+    stdout: String,
+    stderr: String,
+) -> KubectlOpResult {
+    let stdout = stdout.trim_end().to_string();
+    let stderr = stderr.trim().to_string();
+    match (op, exit_code) {
+        (KubectlOpKind::Diff, Some(0)) => KubectlOpResult {
+            op,
+            ok: true,
+            no_changes: true,
+            stdout,
+            stderr,
+        },
+        (KubectlOpKind::Diff, Some(1)) => KubectlOpResult {
+            op,
+            ok: true,
+            no_changes: false,
+            stdout,
+            stderr,
+        },
+        (_, Some(0)) => KubectlOpResult {
+            op,
+            ok: true,
+            no_changes: false,
+            stdout,
+            stderr,
+        },
+        _ => KubectlOpResult {
+            op,
+            ok: false,
+            no_changes: false,
+            stdout,
+            stderr: if stderr.is_empty() {
+                format!(
+                    "kubectl {} exited with status {:?}",
+                    op.label(),
+                    exit_code.unwrap_or(-1)
+                )
+            } else {
+                stderr
+            },
+        },
+    }
+}
+
+/// Run a `kubectl` manifest operation synchronously by piping `yaml` over `stdin` (`-f -`).
+pub fn run_kubectl_stdin(
+    op: KubectlOpKind,
+    yaml: &str,
+    context: Option<&str>,
+    namespace: Option<&str>,
+) -> KubectlOpResult {
+    let args = build_kubectl_stdin_args(op, context, namespace);
+    let mut child = match Command::new("kubectl")
+        .args(&args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            return KubectlOpResult {
+                op,
+                ok: false,
+                no_changes: false,
+                stdout: String::new(),
+                stderr: format!("Failed to spawn kubectl: {e}"),
+            };
+        }
+    };
+
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(yaml.as_bytes());
+    }
+
+    match child.wait_with_output() {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+            let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+            interpret_kubectl_output(op, output.status.code(), stdout, stderr)
+        }
+        Err(e) => KubectlOpResult {
+            op,
+            ok: false,
+            no_changes: false,
+            stdout: String::new(),
+            stderr: format!("Failed waiting for kubectl: {e}"),
+        },
+    }
+}
+
+/// Spawn a background worker thread to run a `kubectl` stdin operation without blocking the TUI.
+pub fn run_kubectl_stdin_async(
+    op: KubectlOpKind,
+    yaml: String,
+    context: Option<String>,
+    namespace: Option<String>,
+    tx: Sender<KubectlOpResult>,
+) {
+    thread::spawn(move || {
+        let res = run_kubectl_stdin(op, &yaml, context.as_deref(), namespace.as_deref());
+        let _ = tx.send(res);
+    });
+}
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -545,5 +725,86 @@ mod tests {
                 ("role".to_string(), "primary".to_string())
             ]
         );
+    }
+
+    #[test]
+    fn test_build_kubectl_stdin_args_for_dry_run_diff_and_apply() {
+        let dry_run_args = build_kubectl_stdin_args(
+            KubectlOpKind::DryRunServer,
+            Some("prod-cluster"),
+            Some("payments"),
+        );
+        assert_eq!(
+            dry_run_args,
+            vec![
+                "--context=prod-cluster",
+                "-n",
+                "payments",
+                "apply",
+                "--dry-run=server",
+                "--request-timeout=5s",
+                "-f",
+                "-",
+            ]
+        );
+
+        let diff_args = build_kubectl_stdin_args(KubectlOpKind::Diff, None, Some("default"));
+        assert_eq!(
+            diff_args,
+            vec!["-n", "default", "diff", "--request-timeout=5s", "-f", "-"]
+        );
+
+        let apply_args = build_kubectl_stdin_args(KubectlOpKind::Apply, Some("minikube"), None);
+        assert_eq!(
+            apply_args,
+            vec![
+                "--context=minikube",
+                "apply",
+                "--request-timeout=5s",
+                "-f",
+                "-"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_interpret_kubectl_output_handles_diff_exit_codes_and_errors() {
+        // Diff exit code 0 -> ok + no_changes
+        let diff_zero =
+            interpret_kubectl_output(KubectlOpKind::Diff, Some(0), String::new(), String::new());
+        assert!(diff_zero.ok);
+        assert!(diff_zero.no_changes);
+
+        // Diff exit code 1 -> ok + changes present
+        let diff_one = interpret_kubectl_output(
+            KubectlOpKind::Diff,
+            Some(1),
+            "--- LIVE\n+++ MERGED\n+  replicas: 3\n".to_string(),
+            String::new(),
+        );
+        assert!(diff_one.ok);
+        assert!(!diff_one.no_changes);
+        assert!(diff_one.stdout.contains("+  replicas: 3"));
+
+        // Diff exit code 2 -> error
+        let diff_err = interpret_kubectl_output(
+            KubectlOpKind::Diff,
+            Some(2),
+            String::new(),
+            "Error from server (Forbidden): deployments.apps is forbidden".to_string(),
+        );
+        assert!(!diff_err.ok);
+        assert!(!diff_err.no_changes);
+        assert!(diff_err.stderr.contains("Forbidden"));
+
+        // DryRunServer exit code 1 -> error (unlike Diff, exit 1 for apply is a failure)
+        let dry_err = interpret_kubectl_output(
+            KubectlOpKind::DryRunServer,
+            Some(1),
+            String::new(),
+            "admission webhook denied the request".to_string(),
+        );
+        assert!(!dry_err.ok);
+        assert!(dry_err.stderr.contains("admission webhook"));
     }
 }

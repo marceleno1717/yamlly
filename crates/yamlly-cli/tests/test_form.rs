@@ -799,3 +799,85 @@ spec:
 
     let _ = std::fs::remove_dir_all(&tmp_dir);
 }
+
+#[test]
+fn test_kubectl_op_runner_plumbing_dry_run_diff_and_apply() {
+    use ratcn::InputState;
+    use yamlly::app::Msg;
+    use yamlly::k8s::KubectlOpKind;
+
+    let mut app = App::new_test();
+    app.open_resource("Deployment", None);
+    app.update(Msg::FormInputChanged {
+        row_idx: 1,
+        state: InputState::new("payments-api"),
+    });
+    assert!(app.tabs[0].dirty);
+
+    let yaml = app.active_yaml().expect("yaml");
+
+    // 1. Server Dry-Run
+    assert!(app.start_kubectl_op(KubectlOpKind::DryRunServer, yaml.clone()));
+    app.poll_background();
+    let dry_res = app.last_kubectl_op.as_ref().expect("dry-run result");
+    assert_eq!(dry_res.op, KubectlOpKind::DryRunServer);
+    assert!(dry_res.ok);
+    assert!(
+        dry_res
+            .stdout
+            .contains("deployment/payments-api configured (server dry run)")
+    );
+    assert!(app.tabs[0].dirty, "dry-run must not clear tab dirty state");
+
+    // 2. Cluster Diff
+    assert!(app.start_kubectl_op(KubectlOpKind::Diff, yaml.clone()));
+    app.poll_background();
+    let diff_res = app.last_kubectl_op.as_ref().expect("diff result");
+    assert_eq!(diff_res.op, KubectlOpKind::Diff);
+    assert!(diff_res.ok);
+    assert!(!diff_res.no_changes);
+    assert!(diff_res.stdout.contains("+  replicas: 3"));
+
+    // 3. Cluster Apply clears dirty state on success
+    assert!(app.start_kubectl_op(KubectlOpKind::Apply, yaml));
+    app.poll_background();
+    let apply_res = app.last_kubectl_op.as_ref().expect("apply result");
+    assert_eq!(apply_res.op, KubectlOpKind::Apply);
+    assert!(apply_res.ok);
+    assert!(
+        !app.tabs[0].dirty,
+        "successful apply must mark active tab clean"
+    );
+}
+
+#[test]
+fn test_cluster_options_disabled_when_disconnected() {
+    use yamlly::app::Msg;
+    use yamlly::k8s::KubectlOpKind;
+    use yamlly::modals::MODAL_CLUSTER_IMPORT;
+
+    let mut app = App::new_test();
+    app.open_resource("Deployment", None);
+    app.cluster_status.connected = false;
+
+    // 1. open_cluster_import_manifest guards against disconnected cluster
+    app.update(Msg::OpenClusterImportManifest);
+    assert!(
+        !app.modals.is_open(MODAL_CLUSTER_IMPORT),
+        "Cluster import modal must not open when disconnected"
+    );
+    assert!(
+        app.active_toast()
+            .unwrap_or("")
+            .contains("Cluster is disconnected"),
+        "Warning toast must notify user of disconnected cluster"
+    );
+
+    // 2. open_cluster_import_for_map guards against disconnected cluster
+    app.update(Msg::OpenClusterImport("metadata.labels".to_string()));
+    assert!(!app.modals.is_open(MODAL_CLUSTER_IMPORT));
+
+    // 3. start_kubectl_op returns false and warns when disconnected
+    let yaml = app.active_yaml().expect("yaml");
+    assert!(!app.start_kubectl_op(KubectlOpKind::DryRunServer, yaml));
+}

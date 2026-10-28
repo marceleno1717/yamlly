@@ -10,8 +10,9 @@ use yamlly_core::field::Row;
 
 use crate::form::FormState;
 use crate::k8s::{
-    ClusterFetchResult, ClusterStatus, check_connection_async, clean_cluster_manifest,
-    extract_map_from_cluster_item, fetch_cluster_resources_async,
+    ClusterFetchResult, ClusterStatus, KubectlOpKind, KubectlOpResult, check_connection_async,
+    clean_cluster_manifest, extract_map_from_cluster_item, fetch_cluster_resources_async,
+    run_kubectl_stdin_async,
 };
 use crate::modals::{
     ClusterImportModalState, ConfirmKind, ConfirmModalState, ContextSwitcherModalState,
@@ -134,6 +135,8 @@ pub struct App {
     pub cluster_status: ClusterStatus,
     pub cluster_rx: Option<Receiver<ClusterStatus>>,
     pub cluster_fetch_rx: Option<Receiver<ClusterFetchResult>>,
+    pub kubectl_op_rx: Option<Receiver<KubectlOpResult>>,
+    pub last_kubectl_op: Option<KubectlOpResult>,
     pub mock_cluster_resources: Option<HashMap<String, Vec<serde_json::Value>>>,
     pub tabs: Vec<TabInfo>,
     pub active_tab_idx: Option<usize>,
@@ -190,6 +193,8 @@ impl App {
             cluster_status: ClusterStatus::default(),
             cluster_rx: Some(rx),
             cluster_fetch_rx: None,
+            kubectl_op_rx: None,
+            last_kubectl_op: None,
             mock_cluster_resources: None,
             tabs: Vec::new(),
             active_tab_idx: None,
@@ -412,6 +417,8 @@ impl App {
             },
             cluster_rx: None,
             cluster_fetch_rx: None,
+            kubectl_op_rx: None,
+            last_kubectl_op: None,
             mock_cluster_resources: Some(mock),
             tabs: Vec::new(),
             active_tab_idx: None,
@@ -490,6 +497,125 @@ impl App {
                 .set_items(fetch_res.items, fetch_res.error);
             self.ui_dirty = true;
         }
+        let completed_kubectl = self
+            .kubectl_op_rx
+            .as_ref()
+            .and_then(|rx| rx.try_recv().ok());
+        if let Some(res) = completed_kubectl {
+            self.kubectl_op_rx = None;
+            self.handle_kubectl_op_result(res);
+        }
+    }
+
+    /// Start a non-blocking `kubectl` manifest operation (`DryRunServer`, `Diff`, or `Apply`).
+    ///
+    /// In headless test mode (`mock_cluster_resources.is_some()`), pushes a deterministic
+    /// synthetic result through the `kubectl_op_rx` channel so `poll_background()` processes
+    /// it identically to a live worker thread.
+    pub fn start_kubectl_op(&mut self, op: KubectlOpKind, yaml: String) -> bool {
+        if !self.cluster_status.connected {
+            self.notify_kind(
+                "Cluster is disconnected — reconnect or switch context first",
+                ToastKind::Warning,
+            );
+            return false;
+        }
+        let (tx, rx) = channel();
+        self.kubectl_op_rx = Some(rx);
+        self.ui_dirty = true;
+
+        if self.mock_cluster_resources.is_some() {
+            let kind = self
+                .active_tab_idx
+                .and_then(|i| self.tabs.get(i))
+                .map(|t| t.kind.to_ascii_lowercase())
+                .unwrap_or_else(|| "resource".to_string());
+            let name = self
+                .active_form()
+                .and_then(|f| f.field_value("metadata.name"))
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or("unnamed")
+                .to_string();
+            let mock_res = match op {
+                KubectlOpKind::DryRunServer => KubectlOpResult {
+                    op,
+                    ok: true,
+                    no_changes: false,
+                    stdout: format!("{kind}/{name} configured (server dry run)"),
+                    stderr: String::new(),
+                },
+                KubectlOpKind::Diff => KubectlOpResult {
+                    op,
+                    ok: true,
+                    no_changes: false,
+                    stdout: format!(
+                        "diff -u -N LIVE/{kind}/{name} MERGED/{kind}/{name}\n\
+                         --- LIVE/{kind}/{name}\n\
+                         +++ MERGED/{kind}/{name}\n\
+                         @@ -1,4 +1,4 @@\n\
+                          apiVersion: apps/v1\n\
+                          kind: Deployment\n\
+                         -  replicas: 1\n\
+                         +  replicas: 3"
+                    ),
+                    stderr: String::new(),
+                },
+                KubectlOpKind::Apply => KubectlOpResult {
+                    op,
+                    ok: true,
+                    no_changes: false,
+                    stdout: format!("{kind}/{name} configured"),
+                    stderr: String::new(),
+                },
+            };
+            let _ = tx.send(mock_res);
+            return true;
+        }
+
+        let context = self.cluster_status.context_name.clone();
+        let namespace = Some(self.cluster_status.namespace.clone());
+        run_kubectl_stdin_async(op, yaml, context, namespace, tx);
+        true
+    }
+
+    pub fn handle_kubectl_op_result(&mut self, res: KubectlOpResult) {
+        if res.ok {
+            let summary = if res.no_changes {
+                "✓ Manifest matches live cluster resource".to_string()
+            } else {
+                res.stdout
+                    .lines()
+                    .next()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| format!("✓ {s}"))
+                    .unwrap_or_else(|| format!("✓ {} succeeded", res.op.label()))
+            };
+            if res.op == KubectlOpKind::Apply
+                && let Some(idx) = self.active_tab_idx
+                && let Some(tab) = self.tabs.get_mut(idx)
+            {
+                tab.form.mark_clean();
+                tab.dirty = false;
+            }
+            self.notify_kind(summary, ToastKind::Info);
+        } else {
+            let err_line = res
+                .stderr
+                .lines()
+                .next()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or("kubectl operation failed")
+                .to_string();
+            self.notify_kind(
+                format!("✕ {}: {err_line}", res.op.label()),
+                ToastKind::Error,
+            );
+        }
+        self.last_kubectl_op = Some(res);
+        self.ui_dirty = true;
     }
 
     pub fn reconnect(&mut self) {
@@ -879,6 +1005,13 @@ impl App {
     }
 
     pub fn open_cluster_import_for_map(&mut self, path: &str, into_map_modal: bool) {
+        if !self.cluster_status.connected {
+            self.notify_kind(
+                "Cluster is disconnected — reconnect or switch context first",
+                ToastKind::Warning,
+            );
+            return;
+        }
         self.cluster_import_modal = ClusterImportModalState::open_for_map(path, into_map_modal);
         let kind = self.cluster_import_modal.selected_kind.clone();
         self.trigger_cluster_fetch(&kind);
@@ -887,6 +1020,13 @@ impl App {
     }
 
     pub fn open_cluster_import_manifest(&mut self) {
+        if !self.cluster_status.connected {
+            self.notify_kind(
+                "Cluster is disconnected — reconnect or switch context first",
+                ToastKind::Warning,
+            );
+            return;
+        }
         let default_kind = self
             .active_resource_kind()
             .or_else(|| self.focused_resource_kind.clone())

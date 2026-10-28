@@ -1297,3 +1297,29 @@ fn test_bottom_bar_buttons_are_clickable() {
         "clicking 'Theme' in bottom bar must cycle the theme"
     );
 }
+
+#[test]
+fn test_cluster_import_disabled_when_disconnected() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+    app.cluster_status.connected = false;
+
+    // In empty workspace state, click "↓ Import from Cluster"
+    let screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(screen.contains("Disconnected"));
+    if let Some((y, line)) = screen
+        .lines()
+        .enumerate()
+        .find(|(_, l)| l.contains("↓ Import from Cluster"))
+    {
+        let x = line
+            .find("↓ Import from Cluster")
+            .map(|b| line[..b].chars().count() as u16)
+            .unwrap();
+        send_click(&mut ratcn, &mut app, x, y as u16);
+        assert!(
+            !app.modals.is_open(MODAL_CLUSTER_IMPORT),
+            "disabled import button must not open modal on click"
+        );
+    }
+}
