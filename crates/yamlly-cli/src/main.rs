@@ -12,15 +12,19 @@ fn main() -> io::Result<()> {
     if let Some(first) = args.first().map(String::as_str) {
         match first {
             "-h" | "--help" => {
-                println!("yamlly 0.0.1 — Kubernetes Manifest Studio (TUI powered by ratcn)");
+                println!("yamlly (ymly) 0.0.1 — Kubernetes Manifest Studio (TUI powered by ratcn)");
                 println!();
                 println!("USAGE:");
                 println!(
-                    "  yamlly [FILE]           Launch interactive TUI (optionally opening FILE)"
+                    "  yamlly | ymly [FILE]          Launch interactive TUI (optionally opening FILE)"
                 );
-                println!("  yamlly --list           List all supported Kubernetes resource kinds");
-                println!("  yamlly --emit <KIND>    Print a starter YAML manifest for KIND");
-                println!("  yamlly --version        Print version information");
+                println!(
+                    "  yamlly | ymly --list          List all supported Kubernetes resource kinds"
+                );
+                println!(
+                    "  yamlly | ymly --emit <KIND>   Print a starter YAML manifest for KIND"
+                );
+                println!("  yamlly | ymly --version       Print version information");
                 return Ok(());
             }
             "-V" | "--version" => {
@@ -50,16 +54,19 @@ fn main() -> io::Result<()> {
         }
     }
 
-    let initial_file = args.into_iter().find(|a| !a.starts_with('-'));
-    run_tui(initial_file)
+    let files: Vec<String> = args.into_iter().filter(|a| !a.starts_with('-')).collect();
+    run_tui(files)
 }
 
-fn run_tui(initial_file: Option<String>) -> io::Result<()> {
+fn run_tui(files: Vec<String>) -> io::Result<()> {
     let mut terminal = ratatui::init();
     let _input_modes = InputModes::new().mouse().paste().enable()?;
 
     let mut ratcn = ui::new_runtime();
-    let mut app = App::new(initial_file);
+    let mut app = App::new(files.first().cloned());
+    for extra_file in files.iter().skip(1) {
+        app.load_file(extra_file);
+    }
 
     let res = event_loop(&mut terminal, &mut ratcn, &mut app);
 

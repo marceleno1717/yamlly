@@ -4,9 +4,9 @@
 
   <p>
     <a href="https://github.com/marceleno1717/yamlly/actions/workflows/ci.yml"><img src="https://github.com/marceleno1717/yamlly/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
-    <a href="https://crates.io/crates/yamlly"><img src="https://img.shields.io/crates/v/yamlly" alt="Crates.io version"></a>
-    <a href="https://pypi.org/project/yamlly/"><img src="https://img.shields.io/pypi/v/yamlly" alt="PyPI version"></a>
-    <a href="https://www.npmjs.com/package/yamlly"><img src="https://img.shields.io/npm/v/yamlly" alt="npm version"></a>
+    <a href="https://crates.io/crates/yamlly-cli"><img src="https://img.shields.io/crates/v/yamlly-cli" alt="Crates.io version"></a>
+    <a href="https://pypi.org/project/yamlly-cli/"><img src="https://img.shields.io/pypi/v/yamlly-cli" alt="PyPI version"></a>
+    <a href="https://www.npmjs.com/package/yamlly-cli"><img src="https://img.shields.io/npm/v/yamlly-cli" alt="npm version"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial-blue.svg" alt="License"></a>
   </p>
 </div>
@@ -30,37 +30,41 @@ Pick a resource, fill in the fields you need, search and mount optional properti
 
 ## 🚀 Installation
 
+Installing `yamlly-cli` from any registry provides both the **`yamlly`** and **`ymly`** commands in your terminal.
+
 ### Option A: Cargo (Rust)
 
 ```bash
-cargo install yamlly
+cargo install yamlly-cli
 ```
 
 ### Option B: PyPI (`pip` / `pipx` / `uv`)
 
 ```bash
-pipx install yamlly
+pipx install yamlly-cli
 # or
-pip install yamlly
+pip install yamlly-cli
 # or run directly with uvx
-uvx yamlly
+uvx --from yamlly-cli yamlly
 ```
 
 ### Option C: npm / npx (Node.js)
 
 ```bash
-# Run directly without installing
-npx yamlly
+# Install globally
+npm install -g yamlly-cli
 
-# Or install globally
-npm install -g yamlly
+# Or run directly without installing
+npx --package=yamlly-cli yamlly
 ```
 
 ## ⌨️ Usage & Keybindings
 
+You can run the CLI using either `yamlly` or the shorthand `ymly`:
+
 ```bash
-yamlly                  # Launch interactive TUI
-yamlly deployment.yaml  # Open an existing YAML manifest
+yamlly                  # Launch interactive TUI (or `ymly`)
+yamlly deployment.yaml  # Open an existing YAML manifest (or `ymly deployment.yaml`)
 yamlly --list           # List all supported Kubernetes resource kinds
 yamlly --emit Deployment # Emit a starter YAML manifest to stdout
 ```

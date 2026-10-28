@@ -3,9 +3,9 @@ requires = ["maturin>=1.7,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "yamlly"
+name = "yamlly-cli"
 version = "0.0.1"
-description = "yamlly — an interactive terminal UI (TUI) for building Kubernetes YAML manifests"
+description = "yamlly (ymly) — an interactive terminal UI (TUI) for building Kubernetes YAML manifests"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.8"

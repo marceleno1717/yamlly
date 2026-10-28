@@ -747,3 +747,55 @@ fn test_string_list_coercion_and_yaml_emission() {
         "StringList should emit a YAML sequence:\n{yaml}"
     );
 }
+
+#[test]
+fn test_app_load_yaml_file_opens_tabs_and_preserves_source_path() {
+    let tmp_dir = std::env::temp_dir().join(format!("yamlly-cli-load-test-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let yaml_path = tmp_dir.join("test-deploy.yaml");
+    let yaml_content = "\
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+  namespace: default
+spec:
+  replicas: 4
+  template:
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+";
+    std::fs::write(&yaml_path, yaml_content).expect("write test yaml");
+
+    let mut app = App::new_test();
+    let opened = app.load_file(&yaml_path.to_string_lossy());
+    assert_eq!(opened, 1);
+    assert_eq!(app.tabs.len(), 1);
+    assert_eq!(app.tabs[0].kind, "Deployment");
+    assert_eq!(app.tabs[0].label, "Deployment: my-nginx");
+    assert_eq!(
+        app.tabs[0].source_path.as_deref(),
+        Some(yaml_path.to_string_lossy().as_ref())
+    );
+    assert_eq!(
+        app.tabs[0].form.field_value("spec.replicas"),
+        Some(&json!(4))
+    );
+    assert_eq!(
+        app.tabs[0]
+            .form
+            .field_value("spec.template.spec.containers[0].image"),
+        Some(&json!("nginx:1.27"))
+    );
+
+    // Opening Preview modal pre-fills with the opened file's shortened path
+    app.open_preview();
+    assert_eq!(
+        app.preview_modal.path_input.value(),
+        yamlly::modals::shorten_home_path(&yaml_path)
+    );
+
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}

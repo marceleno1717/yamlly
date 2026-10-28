@@ -28,6 +28,8 @@ pub struct TabInfo {
     pub default_label: String,
     pub kind: String,
     pub dirty: bool,
+    /// Optional path to the file this tab was loaded from or last saved to.
+    pub source_path: Option<String>,
     /// The resource form being edited in this tab.
     pub form: FormState,
 }
@@ -148,6 +150,8 @@ pub struct App {
     pub context_switcher_modal: ContextSwitcherModalState,
     // Fallback empty input state for borrowing when no tab/row exists
     pub empty_input: InputState,
+    /// Last rendered footer geometry `(x, y, width)` for bottom-bar mouse hit-testing.
+    pub footer_rect: std::cell::Cell<(u16, u16, u16)>,
     pub ui_dirty: bool,
 }
 
@@ -200,22 +204,89 @@ impl App {
             cluster_import_modal: ClusterImportModalState::default(),
             context_switcher_modal: ContextSwitcherModalState::default(),
             empty_input: InputState::default(),
+            footer_rect: std::cell::Cell::new((0, u16::MAX, 0)),
             ui_dirty: true,
         };
 
-        if let Some(file_path) = initial_file
-            && let Ok(content) = std::fs::read_to_string(&file_path)
-            && let Ok(val) = serde_json::from_str::<serde_json::Value>(&content)
-            && let Some(kind) = val.get("kind").and_then(|k| k.as_str())
-        {
-            app.open_resource(kind, Some(&val));
-            if let Some(pos) = app.resources.iter().position(|r| r.kind == kind) {
-                app.selected_resource_idx = pos;
-                app.focused_resource_kind = Some(kind.to_string());
-            }
+        if let Some(file_path) = initial_file {
+            app.load_file(&file_path);
         }
 
         app
+    }
+
+    /// Load one or more Kubernetes resource manifests from a YAML or JSON file on disk
+    /// and open an editor tab for each supported resource.
+    pub fn load_file(&mut self, file_path: &str) -> usize {
+        let content = match std::fs::read_to_string(file_path) {
+            Ok(c) => c,
+            Err(e) => {
+                self.notify_kind(
+                    format!("Could not read '{file_path}': {e}"),
+                    ToastKind::Error,
+                );
+                return 0;
+            }
+        };
+
+        let docs = match yamlly_core::parse_yaml_documents(&content) {
+            Ok(d) => d,
+            Err(e) => {
+                self.notify_kind(
+                    format!("Failed to parse '{file_path}': {e}"),
+                    ToastKind::Error,
+                );
+                return 0;
+            }
+        };
+
+        let mut items = Vec::new();
+        for doc in docs {
+            if doc.get("kind").and_then(|k| k.as_str()) == Some("List")
+                && let Some(arr) = doc.get("items").and_then(|i| i.as_array())
+            {
+                items.extend(arr.iter().cloned());
+            } else {
+                items.push(doc);
+            }
+        }
+
+        let single_doc = items.len() == 1;
+        let mut opened = 0usize;
+        for raw_doc in &items {
+            let Some(raw_kind) = raw_doc.get("kind").and_then(|k| k.as_str()) else {
+                continue;
+            };
+            let canonical_kind = self
+                .resources
+                .iter()
+                .find(|r| r.kind.eq_ignore_ascii_case(raw_kind))
+                .map(|r| r.kind.clone())
+                .unwrap_or_else(|| raw_kind.to_string());
+
+            if yamlly_core::load_resource_ref(&canonical_kind).is_none() {
+                self.notify_kind(
+                    format!("Unsupported resource kind '{raw_kind}' in '{file_path}'"),
+                    ToastKind::Warning,
+                );
+                continue;
+            }
+
+            let cleaned = clean_cluster_manifest(raw_doc);
+            self.open_resource(&canonical_kind, Some(&cleaned));
+            if single_doc && let Some(tab) = self.tabs.last_mut() {
+                tab.source_path = Some(file_path.to_string());
+            }
+            opened += 1;
+        }
+
+        if opened == 0 {
+            self.notify_kind(
+                format!("No supported Kubernetes resource found in '{file_path}'"),
+                ToastKind::Warning,
+            );
+        }
+        opened
     }
 
     /// Construct a headless/testing App without background threads.
@@ -355,6 +426,7 @@ impl App {
             cluster_import_modal: ClusterImportModalState::default(),
             context_switcher_modal: ContextSwitcherModalState::default(),
             empty_input: InputState::default(),
+            footer_rect: std::cell::Cell::new((0, u16::MAX, 0)),
             ui_dirty: true,
         }
     }
@@ -555,6 +627,7 @@ impl App {
             default_label,
             kind: kind.to_string(),
             dirty: false,
+            source_path: None,
             form,
         };
 
@@ -753,13 +826,18 @@ impl App {
             return;
         };
         let yaml = yamlly_core::emit_yaml_owned(tab.form.data.clone());
-        let name = tab
-            .form
-            .field_value("metadata.name")
-            .and_then(|v| v.as_str())
-            .filter(|s| !s.is_empty())
-            .unwrap_or("app");
-        let filename = format!("{}-{}.yaml", name, tab.kind.to_lowercase());
+        let filename = match &tab.source_path {
+            Some(p) if !p.trim().is_empty() => p.clone(),
+            _ => {
+                let name = tab
+                    .form
+                    .field_value("metadata.name")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or("app");
+                format!("{}-{}.yaml", name, tab.kind.to_lowercase())
+            }
+        };
         self.preview_modal = PreviewModalState::open_for(yaml, filename);
         let _ = self.modals.open(MODAL_PREVIEW, &mut self.focus);
         self.ui_dirty = true;
@@ -1269,13 +1347,14 @@ impl App {
                 }
                 match std::fs::write(&target_path, yaml.as_bytes()) {
                     Ok(()) => {
-                        let display_path = target_path.to_string_lossy().to_string();
+                        let display_path = crate::modals::shorten_home_path(&target_path);
                         self.preview_modal.path_input = InputState::new(display_path.clone());
                         let _ = self.modals.close(&mut self.focus);
                         if let Some(idx) = self.active_tab_idx
                             && let Some(tab) = self.tabs.get_mut(idx)
                         {
                             tab.dirty = false;
+                            tab.source_path = Some(display_path.clone());
                             tab.form.mark_clean();
                         }
                         self.notify_kind(format!("Saved → {display_path}"), ToastKind::Success);

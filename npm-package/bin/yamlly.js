@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * yamlly launcher — detects the current platform, resolves the pre-built
+ * yamlly / ymly launcher — detects the current platform, resolves the pre-built
  * native Rust binary from the optional platform package (or postinstall fallback),
  * and spawns it with inherited stdio.
  */
@@ -12,10 +12,9 @@ const fs = require("fs");
 const os = require("os");
 
 const PLATFORM_MAP = {
-  "linux-x64": "@yamlly/linux-x64-bin",
-  "darwin-x64": "@yamlly/darwin-x64-bin",
-  "darwin-arm64": "@yamlly/darwin-arm64-bin",
-  "win32-x64": "@yamlly/win32-x64-bin",
+  "linux-x64": "@yamlly-cli/linux-x64-bin",
+  "darwin-arm64": "@yamlly-cli/darwin-arm64-bin",
+  "win32-x64": "@yamlly-cli/win32-x64-bin",
 };
 
 const key = `${process.platform}-${os.arch()}`;
@@ -23,7 +22,7 @@ const pkg = PLATFORM_MAP[key];
 
 if (!pkg) {
   console.error(`yamlly: unsupported platform: ${key}`);
-  console.error("Supported platforms: linux-x64, darwin-x64, darwin-arm64, win32-x64");
+  console.error("Supported platforms: linux-x64, darwin-arm64, win32-x64");
   process.exit(1);
 }
 
@@ -52,7 +51,7 @@ if (!binPath) {
 
 if (!binPath || !fs.existsSync(binPath)) {
   console.error(`yamlly: native binary for ${key} was not found.`);
-  console.error("Try reinstalling: npm install -g yamlly");
+  console.error("Try reinstalling: npm install -g yamlly-cli");
   process.exit(1);
 }
 

@@ -20,7 +20,8 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, Paragraph, Widget};
 use ratcn::runtime::{
-    ChildId, DeclareCtx, Event, EventResult, KeyCode, PaintCtx, Ratcn, ScopeOptions, TabWrap,
+    ChildId, DeclareCtx, Event, EventResult, FocusState, KeyCode, KeyEvent, MouseButton, MouseKind,
+    PaintCtx, Ratcn, ScopeOptions, TabWrap,
 };
 use ratcn::{
     BorderStyle, Button, ButtonSize, Checkbox, Dialog, Input, List, ListItem, ScrollArea, Tab,
@@ -70,6 +71,16 @@ pub fn render(ratcn: &mut Ratcn<App, Msg>, frame: &mut Frame, app: &App) {
 pub fn handle_event(ratcn: &mut Ratcn<App, Msg>, app: &mut App, event: Event) -> bool {
     if app.handle_global_ctrl_shortcut(&event) {
         return true;
+    }
+    if let Event::Mouse(mouse) = &event {
+        if mouse.kind == MouseKind::Down(MouseButton::Left)
+            && handle_footer_click(ratcn, app, mouse.column, mouse.row)
+        {
+            return true;
+        }
+        if mouse.kind == MouseKind::Up(MouseButton::Left) && is_on_footer_row(app, mouse.row) {
+            return true;
+        }
     }
     if let Event::Key(key) = &event {
         if !key.modifiers.any() {
@@ -1446,10 +1457,146 @@ fn paint_field_container(
 }
 
 // ---------------------------------------------------------------------------
-// Footer Status & Keybindings Bar
+// Footer Status & Clickable Keybindings Bar
 // ---------------------------------------------------------------------------
 
+#[derive(Clone, Copy)]
+enum FooterAction {
+    ModalNext,
+    ModalMoveDown,
+    ModalSubmit,
+    CloseModal,
+    NextField,
+    FocusSidebarFilter,
+    OpenFieldPicker,
+    RemoveFocusedField,
+    OpenContextSwitcher,
+    ValidateForm,
+    OpenPreview,
+    CloseActiveTab,
+    CycleTheme,
+    RequestQuit,
+    NextResource,
+    OpenSelectedResource,
+    SwitchPane,
+}
+
+fn footer_items(
+    has_modal: bool,
+    has_tab: bool,
+) -> &'static [(&'static str, &'static str, FooterAction)] {
+    if has_modal {
+        &[
+            ("Tab", "Next", FooterAction::ModalNext),
+            ("↑↓", "Move", FooterAction::ModalMoveDown),
+            ("Enter", "Select/Submit", FooterAction::ModalSubmit),
+            ("Esc", "Close Modal", FooterAction::CloseModal),
+        ]
+    } else if has_tab {
+        &[
+            ("Tab/↑↓", "Fields", FooterAction::NextField),
+            ("/", "Filter", FooterAction::FocusSidebarFilter),
+            ("+/^F", "Add Fields", FooterAction::OpenFieldPicker),
+            ("^D", "Remove", FooterAction::RemoveFocusedField),
+            ("c", "Context", FooterAction::OpenContextSwitcher),
+            ("^V", "Validate", FooterAction::ValidateForm),
+            ("p/^S", "Preview & Save", FooterAction::OpenPreview),
+            ("^W", "Close", FooterAction::CloseActiveTab),
+            ("t", "Theme", FooterAction::CycleTheme),
+            ("q", "Quit", FooterAction::RequestQuit),
+        ]
+    } else {
+        &[
+            ("↑↓/jk", "Navigate", FooterAction::NextResource),
+            ("Enter", "Open Resource", FooterAction::OpenSelectedResource),
+            ("/", "Filter Kinds", FooterAction::FocusSidebarFilter),
+            ("c / ^K", "Context", FooterAction::OpenContextSwitcher),
+            ("Tab", "Switch Pane", FooterAction::SwitchPane),
+            ("t", "Theme", FooterAction::CycleTheme),
+            ("q", "Quit", FooterAction::RequestQuit),
+        ]
+    }
+}
+
+fn is_on_footer_row(app: &App, row: u16) -> bool {
+    let (_, fy, _) = app.footer_rect.get();
+    fy != u16::MAX && row == fy
+}
+
+fn handle_footer_click(ratcn: &mut Ratcn<App, Msg>, app: &mut App, col: u16, row: u16) -> bool {
+    let (fx, fy, fw) = app.footer_rect.get();
+    if fy == u16::MAX || row != fy || col < fx || col >= fx.saturating_add(fw) {
+        return false;
+    }
+
+    let has_modal = app.modals.top().is_some();
+    let has_tab = app.active_tab_idx.is_some();
+    let items = footer_items(has_modal, has_tab);
+
+    let mut x = fx.saturating_add(1); // leading " "
+    for (i, (k, desc, action)) in items.iter().enumerate() {
+        if i > 0 {
+            x = x.saturating_add(2); // "  " separator
+        }
+        let item_w = (k.chars().count() + 2 + 1 + desc.chars().count()) as u16;
+        if col >= x && col < x.saturating_add(item_w) {
+            trigger_footer_action(ratcn, app, *action);
+            return true;
+        }
+        x = x.saturating_add(item_w);
+    }
+    false
+}
+
+fn trigger_footer_action(ratcn: &mut Ratcn<App, Msg>, app: &mut App, action: FooterAction) {
+    match action {
+        FooterAction::ModalNext | FooterAction::SwitchPane => {
+            handle_event(ratcn, app, Event::Key(KeyEvent::new(KeyCode::Tab)));
+        }
+        FooterAction::ModalMoveDown => {
+            handle_event(ratcn, app, Event::Key(KeyEvent::new(KeyCode::Down)));
+        }
+        FooterAction::ModalSubmit => {
+            handle_event(ratcn, app, Event::Key(KeyEvent::new(KeyCode::Enter)));
+        }
+        FooterAction::CloseModal => app.update(Msg::CloseModal),
+        FooterAction::NextField => {
+            if let Some(form) = app.active_form_mut() {
+                form.focus_next_field(true);
+                let idx = form.focus;
+                app.focus = FocusState::intent([
+                    ChildId::Static("workspace"),
+                    ChildId::Static("form"),
+                    ChildId::from(format!("field-{idx}")),
+                ]);
+                app.ui_dirty = true;
+            }
+        }
+        FooterAction::FocusSidebarFilter => {
+            app.focus = FocusState::intent(["sidebar", "filter"]);
+            app.ui_dirty = true;
+        }
+        FooterAction::OpenFieldPicker => app.update(Msg::OpenFieldPicker),
+        FooterAction::RemoveFocusedField => app.update(Msg::RemoveFocusedField),
+        FooterAction::OpenContextSwitcher => app.update(Msg::OpenContextSwitcher),
+        FooterAction::ValidateForm => app.update(Msg::ValidateForm),
+        FooterAction::OpenPreview => app.update(Msg::OpenPreview),
+        FooterAction::CloseActiveTab => app.update(Msg::CloseActiveTab),
+        FooterAction::CycleTheme => app.update(Msg::CycleTheme),
+        FooterAction::RequestQuit => app.update(Msg::RequestQuit),
+        FooterAction::NextResource => {
+            app.select_next_resource();
+            app.focus = FocusState::intent(["sidebar", "resources"]);
+        }
+        FooterAction::OpenSelectedResource => {
+            app.open_selected_resource();
+        }
+    }
+}
+
 fn declare_footer(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
+    ctx.state().footer_rect.set((area.x, area.y, area.width));
+
     let has_modal = ctx.state().modals.top().is_some();
     let has_tab = ctx.state().active_tab_idx.is_some();
 
@@ -1459,43 +1606,13 @@ fn declare_footer(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
         let key_fg = pctx.theme.secondary_foreground;
         let muted = pctx.theme.muted_foreground;
 
-        let pairs: &[(&str, &str)] = if has_modal {
-            &[
-                ("Tab", "Next"),
-                ("↑↓", "Move"),
-                ("Enter", "Select/Submit"),
-                ("Esc", "Close Modal"),
-            ]
-        } else if has_tab {
-            &[
-                ("Tab/↑↓", "Fields"),
-                ("/", "Filter"),
-                ("+ / ^F", "Add Fields"),
-                ("^D", "Remove Field"),
-                ("c / ^K", "Context"),
-                ("^V", "Validate"),
-                ("p / ^S", "Preview & Save"),
-                ("^W", "Close Tab"),
-                ("t", "Theme"),
-                ("q", "Quit"),
-            ]
-        } else {
-            &[
-                ("↑↓/jk", "Navigate"),
-                ("Enter", "Open Resource"),
-                ("/", "Filter Kinds"),
-                ("c / ^K", "Context"),
-                ("Tab", "Switch Pane"),
-                ("t", "Theme"),
-                ("q", "Quit"),
-            ]
-        };
+        let pairs = footer_items(has_modal, has_tab);
 
         let mut spans = Vec::new();
         spans.push(Span::raw(" "));
-        for (i, (k, desc)) in pairs.iter().enumerate() {
+        for (i, (k, desc, _)) in pairs.iter().enumerate() {
             if i > 0 {
-                spans.push(Span::raw("   "));
+                spans.push(Span::raw("  "));
             }
             spans.push(Span::styled(
                 format!(" {k} "),
@@ -1776,7 +1893,7 @@ fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                 Input::new()
                     .prefix("  ")
                     .title(" Destination file path ")
-                    .placeholder("/path/to/manifest.yaml")
+                    .placeholder("~/path/to/manifest.yaml")
                     .value(
                         |app: &App| &app.preview_modal.path_input,
                         Msg::PreviewPathChanged,
@@ -1858,7 +1975,7 @@ fn paint_highlighted_yaml(pctx: &mut PaintCtx<'_, App>, area: Rect, yaml: &str) 
 
 fn declare_dir_picker_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
     let dp = &ctx.state().dir_picker_modal;
-    let dir_display = dp.current_dir.to_string_lossy().to_string();
+    let dir_display = crate::modals::shorten_home_path(&dp.current_dir);
     let mut items: Vec<ListItem<String>> = vec![ListItem::new(
         crate::modals::DIR_PICKER_CURRENT_TOKEN.to_string(),
         format!("📍 .  (Save in {dir_display})"),

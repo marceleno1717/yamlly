@@ -63,12 +63,7 @@ jobs:
             rust_target: x86_64-unknown-linux-gnu
             bin: yamlly
 
-          - os: macos-13
-            target: darwin-x64
-            rust_target: x86_64-apple-darwin
-            bin: yamlly
-
-          - os: macos-latest
+          - os: macos-latest      # Apple Silicon (M1+)
             target: darwin-arm64
             rust_target: aarch64-apple-darwin
             bin: yamlly
@@ -93,7 +88,7 @@ jobs:
           key: ${{ matrix.rust_target }}
 
       - name: Build release binary
-        run: cargo build --release --target ${{ matrix.rust_target }} -p yamlly
+        run: cargo build --release --target ${{ matrix.rust_target }} -p yamlly-cli --bin yamlly
 
       - name: Smoke-test binary (--version and --list)
         shell: bash
@@ -131,10 +126,9 @@ jobs:
         run: |
           mkdir -p release
           cp artifacts/yamlly-linux-x64/yamlly       release/yamlly-linux-x64
-          cp artifacts/yamlly-darwin-x64/yamlly      release/yamlly-darwin-x64
           cp artifacts/yamlly-darwin-arm64/yamlly    release/yamlly-darwin-arm64
           cp artifacts/yamlly-win32-x64/yamlly.exe   release/yamlly-win32-x64.exe
-          chmod +x release/yamlly-linux-x64 release/yamlly-darwin-x64 release/yamlly-darwin-arm64
+          chmod +x release/yamlly-linux-x64 release/yamlly-darwin-arm64
           (cd release && sha256sum * > SHA256SUMS.txt)
 
       - name: Create GitHub Release
@@ -167,15 +161,15 @@ jobs:
         run: |
           echo "Running crates.io packaging verification (dry-run)..."
           cargo publish -p yamlly-core --dry-run --allow-dirty
-          cargo package -p yamlly --list --allow-dirty
+          cargo package -p yamlly-cli --list --allow-dirty
 
       - name: Publish yamlly-core to crates.io
         if: ${{ inputs.dry_run != true && env.CARGO_REGISTRY_TOKEN != '' }}
         run: cargo publish -p yamlly-core
 
-      - name: Publish yamlly to crates.io
+      - name: Publish yamlly-cli to crates.io
         if: ${{ inputs.dry_run != true && env.CARGO_REGISTRY_TOKEN != '' }}
-        run: cargo publish -p yamlly
+        run: cargo publish -p yamlly-cli
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 5. Build Python wheels + sdist with maturin and publish to PyPI
@@ -191,9 +185,6 @@ jobs:
           - os: ubuntu-latest
             target: x86_64
             manylinux: auto
-          - os: macos-13
-            target: x86_64
-            manylinux: ""
           - os: macos-latest
             target: aarch64
             manylinux: ""
@@ -264,7 +255,6 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
           skip-existing: true
 
   # ─────────────────────────────────────────────────────────────────────────────
@@ -274,8 +264,9 @@ jobs:
     name: Publish to npm
     needs: build-binaries
     runs-on: ubuntu-latest
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -283,8 +274,11 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm for OIDC Trusted Publishing support (npm >= 11.5.1)
+        run: npm install -g npm@latest
 
       - name: Download all binary artifacts
         uses: actions/download-artifact@v4
@@ -317,7 +311,6 @@ jobs:
           }
 
           stage linux-x64    yamlly
-          stage darwin-x64   yamlly
           stage darwin-arm64 yamlly
           stage win32-x64    yamlly.exe
 
@@ -333,7 +326,7 @@ jobs:
           "
 
       - name: Dry-run npm publish
-        if: ${{ inputs.dry_run == true || env.NODE_AUTH_TOKEN == '' }}
+        if: ${{ inputs.dry_run == true }}
         run: |
           for pkg in npm-package/npm/yamlly-*/; do
             echo "Dry-run packing $pkg ..."
@@ -343,7 +336,7 @@ jobs:
           npm pack ./npm-package --dry-run
 
       - name: Publish platform packages to npm
-        if: ${{ inputs.dry_run != true && env.NODE_AUTH_TOKEN != '' }}
+        if: ${{ inputs.dry_run != true }}
         run: |
           for pkg in npm-package/npm/yamlly-*/; do
             echo "Publishing $pkg ..."
@@ -353,7 +346,7 @@ jobs:
           done
 
       - name: Publish main package to npm
-        if: ${{ inputs.dry_run != true && env.NODE_AUTH_TOKEN != '' }}
+        if: ${{ inputs.dry_run != true }}
         run: |
           cd npm-package
           chmod +x bin/yamlly.js

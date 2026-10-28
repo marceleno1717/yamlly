@@ -541,6 +541,24 @@ pub fn expand_tilde(raw: &str) -> PathBuf {
     PathBuf::from(trimmed)
 }
 
+/// Format `path` cleanly by replacing the current user's home directory prefix
+/// (`$HOME` or `%USERPROFILE%`) with `~`.
+pub fn shorten_home_path(path: &Path) -> String {
+    if let Some(home_os) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
+        let home = PathBuf::from(&home_os);
+        let canon_home = std::fs::canonicalize(&home).unwrap_or_else(|_| home.clone());
+        for candidate in [&canon_home, &home] {
+            if let Ok(rel) = path.strip_prefix(candidate) {
+                if rel.as_os_str().is_empty() {
+                    return "~".to_string();
+                }
+                return format!("~/{}", rel.to_string_lossy().replace('\\', "/"));
+            }
+        }
+    }
+    path.to_string_lossy().to_string()
+}
+
 /// Lexically normalize `.` and `..` path components without requiring the final leaf to exist.
 pub fn normalize_lexical_path(path: &Path) -> PathBuf {
     use std::path::Component;
@@ -606,10 +624,7 @@ pub struct PreviewModalState {
 impl Default for PreviewModalState {
     fn default() -> Self {
         let filename = "manifest.yaml".to_string();
-        let default_path = default_save_dir()
-            .join(&filename)
-            .to_string_lossy()
-            .to_string();
+        let default_path = shorten_home_path(&default_save_dir().join(&filename));
         Self {
             yaml: String::new(),
             filename,
@@ -620,15 +635,32 @@ impl Default for PreviewModalState {
 }
 
 impl PreviewModalState {
-    pub fn open_for(yaml: String, filename: String) -> Self {
-        let default_path = default_save_dir()
-            .join(&filename)
-            .to_string_lossy()
-            .to_string();
+    pub fn open_for(yaml: String, filename_or_path: String) -> Self {
+        let is_path_like = filename_or_path.contains('/')
+            || filename_or_path.contains('\\')
+            || filename_or_path.starts_with('~');
+        let (leaf_name, full_path) = if is_path_like {
+            let expanded = expand_tilde(&filename_or_path);
+            let abs = if expanded.is_absolute() {
+                normalize_lexical_path(&expanded)
+            } else {
+                normalize_lexical_path(&default_save_dir().join(expanded))
+            };
+            let leaf = abs
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "manifest.yaml".to_string());
+            (leaf, abs)
+        } else {
+            let full = default_save_dir().join(&filename_or_path);
+            (filename_or_path, full)
+        };
+        let display_path = shorten_home_path(&full_path);
         Self {
             yaml,
-            filename,
-            path_input: InputState::new(default_path),
+            filename: leaf_name,
+            path_input: InputState::new(display_path),
             scroll: 0,
         }
     }
@@ -654,7 +686,7 @@ impl PreviewModalState {
         let fname = self.effective_filename();
         self.filename = fname.clone();
         let abs_dir = resolve_abs_dir(dir);
-        let full = abs_dir.join(&fname).to_string_lossy().to_string();
+        let full = shorten_home_path(&abs_dir.join(&fname));
         self.path_input = InputState::new(full);
     }
 

@@ -1,17 +1,26 @@
 [package]
-name = "yamlly"
+name = "yamlly-cli"
 version = "0.0.1"
 edition = "2024"
-description = "An interactive terminal UI (TUI) for building and editing Kubernetes YAML manifests"
+description = "yamlly — An interactive terminal UI (TUI) for building and editing Kubernetes YAML manifests"
 license-file = "LICENSE"
 readme = "README.md"
 repository.workspace = true
 homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
+default-run = "yamlly"
+
+[lib]
+name = "yamlly"
+path = "src/lib.rs"
 
 [[bin]]
 name = "yamlly"
+path = "src/main.rs"
+
+[[bin]]
+name = "ymly"
 path = "src/main.rs"
 
 [dependencies]

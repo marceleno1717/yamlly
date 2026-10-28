@@ -316,9 +316,15 @@ fn test_preview_and_stacked_dir_picker_and_save_to_disk() {
     assert!(app.modals.is_open(MODAL_PREVIEW));
     let initial_path = app.preview_modal.path_input.value().to_string();
     assert!(
-        std::path::Path::new(&initial_path).is_absolute(),
-        "default save path must be absolute, not relative: {initial_path}"
+        yamlly::modals::expand_tilde(&initial_path).is_absolute(),
+        "default save path must resolve to an absolute path: {initial_path}"
     );
+    if std::env::var_os("HOME").is_some() {
+        assert!(
+            initial_path.starts_with("~/") || initial_path.starts_with('/'),
+            "default save path must use ~ or absolute prefix: {initial_path}"
+        );
+    }
     assert!(
         !initial_path.starts_with("./"),
         "default save path must not start with ./: {initial_path}"
@@ -357,13 +363,13 @@ fn test_preview_and_stacked_dir_picker_and_save_to_disk() {
     );
     let parent_dir = app.dir_picker_modal.current_dir.clone();
 
-    // Select current parent directory -> updates preview path to parent_dir/app-cfg-configmap.yaml
+    // Select current parent directory -> updates preview path to shortened parent_dir/app-cfg-configmap.yaml
     app.update(Msg::DirPickerSelectCurrent);
     assert!(!app.modals.is_open(MODAL_DIR_PICKER));
     assert!(app.modals.is_open(MODAL_PREVIEW));
     assert_eq!(
-        std::path::Path::new(app.preview_modal.path_input.value()),
-        parent_dir.join("app-cfg-configmap.yaml")
+        app.preview_modal.path_input.value(),
+        yamlly::modals::shorten_home_path(&parent_dir.join("app-cfg-configmap.yaml"))
     );
 
     // Save to a temporary directory anywhere on the system
@@ -1218,5 +1224,76 @@ fn test_remove_added_fields_categories_and_array_items() {
     assert!(
         screen_one_item.contains("containers [1 item]"),
         "removing array item must return count to 1:\n{screen_one_item}"
+    );
+}
+
+#[test]
+fn test_bottom_bar_buttons_are_clickable() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+
+    // 1. In empty state, click "Open Resource" on the bottom bar
+    let screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    let footer_y = 35u16;
+    let footer_line = screen.lines().nth(footer_y as usize).expect("footer line");
+    let open_x = footer_line
+        .find("Open Resource")
+        .map(|b| footer_line[..b].chars().count() as u16)
+        .expect("find Open Resource in footer");
+    send_click(&mut ratcn, &mut app, open_x, footer_y);
+    assert_eq!(
+        app.tabs.len(),
+        1,
+        "clicking 'Open Resource' in bottom bar must open a tab"
+    );
+
+    // 2. With a tab open, click "Preview & Save" on the bottom bar
+    let screen_tab = render_frame(&mut ratcn, &mut app, 140, 36);
+    let footer_line_tab = screen_tab
+        .lines()
+        .nth(footer_y as usize)
+        .expect("footer line");
+    let preview_x = footer_line_tab
+        .find("Preview & Save")
+        .map(|b| footer_line_tab[..b].chars().count() as u16)
+        .expect("find Preview & Save in footer");
+    send_click(&mut ratcn, &mut app, preview_x, footer_y);
+    assert!(
+        app.modals.is_open(MODAL_PREVIEW),
+        "clicking 'Preview & Save' in bottom bar must open the preview modal"
+    );
+
+    // 3. While modal is open, click "Close Modal" on the bottom bar
+    let screen_modal = render_frame(&mut ratcn, &mut app, 140, 36);
+    let footer_line_modal = screen_modal
+        .lines()
+        .nth(footer_y as usize)
+        .expect("footer line");
+    let close_x = footer_line_modal
+        .find("Close Modal")
+        .map(|b| footer_line_modal[..b].chars().count() as u16)
+        .expect("find Close Modal in footer");
+    send_click(&mut ratcn, &mut app, close_x, footer_y);
+    assert!(
+        !app.modals.is_open(MODAL_PREVIEW),
+        "clicking 'Close Modal' in bottom bar must close the active modal"
+    );
+
+    // 4. Click "Theme" on the bottom bar
+    let prev_theme = app.theme().name;
+    let screen_after = render_frame(&mut ratcn, &mut app, 140, 36);
+    let footer_line_after = screen_after
+        .lines()
+        .nth(footer_y as usize)
+        .expect("footer line");
+    let theme_x = footer_line_after
+        .find("Theme")
+        .map(|b| footer_line_after[..b].chars().count() as u16)
+        .expect("find Theme in footer");
+    send_click(&mut ratcn, &mut app, theme_x, footer_y);
+    assert_ne!(
+        app.theme().name,
+        prev_theme,
+        "clicking 'Theme' in bottom bar must cycle the theme"
     );
 }

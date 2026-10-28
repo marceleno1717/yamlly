@@ -17,3 +17,23 @@ pub use loader::{
     ResourceIndexEntry,
 };
 pub use state::{decode_path, encode_path, get_nested, is_dirty, normalize, set_nested, Segment};
+
+/// Parse one or more YAML (or JSON) documents from `content` into `serde_json::Value`s.
+pub fn parse_yaml_documents(content: &str) -> Result<Vec<serde_json::Value>, String> {
+    use serde::Deserialize;
+
+    if let Ok(single_json) = serde_json::from_str::<serde_json::Value>(content) {
+        if !single_json.is_null() {
+            return Ok(vec![single_json]);
+        }
+    }
+
+    let mut docs = Vec::new();
+    for doc in serde_yaml::Deserializer::from_str(content) {
+        let val = serde_json::Value::deserialize(doc).map_err(|e| e.to_string())?;
+        if !val.is_null() {
+            docs.push(val);
+        }
+    }
+    Ok(docs)
+}

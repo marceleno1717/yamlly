@@ -12,10 +12,9 @@ const path = require("path");
 const https = require("https");
 
 const PLATFORM_MAP = {
-  "linux-x64": { pkg: "@yamlly/linux-x64-bin", asset: "yamlly-linux-x64" },
-  "darwin-x64": { pkg: "@yamlly/darwin-x64-bin", asset: "yamlly-darwin-x64" },
-  "darwin-arm64": { pkg: "@yamlly/darwin-arm64-bin", asset: "yamlly-darwin-arm64" },
-  "win32-x64": { pkg: "@yamlly/win32-x64-bin", asset: "yamlly-win32-x64.exe" },
+  "linux-x64": { pkg: "@yamlly-cli/linux-x64-bin", asset: "yamlly-linux-x64" },
+  "darwin-arm64": { pkg: "@yamlly-cli/darwin-arm64-bin", asset: "yamlly-darwin-arm64" },
+  "win32-x64": { pkg: "@yamlly-cli/win32-x64-bin", asset: "yamlly-win32-x64.exe" },
 };
 
 const key = `${process.platform}-${os.arch()}`;
