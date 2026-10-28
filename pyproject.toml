@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "yamlly-cli"
-version = "0.0.2"
+dynamic = ["version"]
 description = "yamlly (ymly) — an interactive terminal UI (TUI) for building Kubernetes YAML manifests"
 readme = "README.md"
 license = { file = "LICENSE" }
