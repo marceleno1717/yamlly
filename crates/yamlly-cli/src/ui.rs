@@ -1857,8 +1857,17 @@ fn declare_field_picker_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
 fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
     let yaml = ctx.state().preview_modal.yaml.clone();
     let line_count = (yaml.lines().count() as u16).max(1);
+    let is_connected = ctx.state().cluster_status.connected;
+    let is_running = ctx.state().preview_modal.is_running_op.is_some();
+    let last_status = ctx.state().preview_modal.last_status.clone();
+    let context_name = ctx
+        .state()
+        .cluster_status
+        .context_name
+        .clone()
+        .unwrap_or_else(|| "cluster".to_string());
 
-    let outer_w = (ctx.area().width.saturating_sub(4)).clamp(88, 116);
+    let outer_w = (ctx.area().width.saturating_sub(4)).clamp(92, 120);
     let dialog = Dialog::new()
         .title("YAML Preview & Save Manifest")
         .outer_width(outer_w)
@@ -1868,15 +1877,72 @@ fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
             if body.height < 6 {
                 return;
             }
-            let scroll_h = body.height.saturating_sub(4);
-            let yaml_rect = Rect::new(body.x, body.y, body.width, scroll_h);
+            let has_status = is_running || last_status.is_some();
+            let banner_h = if has_status && body.height >= 9 {
+                2u16
+            } else {
+                0u16
+            };
+            let scroll_h = body.height.saturating_sub(4 + banner_h);
+            let banner_rect = Rect::new(body.x, body.y, body.width, banner_h);
+            let yaml_rect = Rect::new(
+                body.x,
+                body.y.saturating_add(banner_h),
+                body.width,
+                scroll_h,
+            );
             // 1 blank row of spacing between YAML scroll area and path Input
             let path_rect = Rect::new(
                 body.x,
-                body.y.saturating_add(scroll_h).saturating_add(1),
+                body.y
+                    .saturating_add(banner_h)
+                    .saturating_add(scroll_h)
+                    .saturating_add(1),
                 body.width,
                 3,
             );
+
+            if banner_h > 0 {
+                let status_val = last_status.clone();
+                let ctx_name = context_name.clone();
+                ctx.paint(move |pctx| {
+                    let (icon, text, fg) = if is_running {
+                        (
+                            "◌",
+                            format!("Running server dry-run validation against {ctx_name}…"),
+                            pctx.theme.warning,
+                        )
+                    } else if let Some((ok, msg)) = &status_val {
+                        if *ok {
+                            (
+                                "✓",
+                                format!("Server dry-run: {msg}"),
+                                Color::Rgb(74, 222, 128),
+                            )
+                        } else {
+                            (
+                                "✕",
+                                format!("Server dry-run failed: {msg}"),
+                                pctx.theme.destructive,
+                            )
+                        }
+                    } else {
+                        ("", String::new(), pctx.theme.foreground)
+                    };
+                    pctx.with_buffer(banner_rect, |rect, buf| {
+                        buf.set_style(rect, Style::default().bg(pctx.theme.surface));
+                        let line = Line::from(vec![
+                            Span::raw(" "),
+                            Span::styled(
+                                format!("{icon} "),
+                                Style::default().fg(fg).add_modifier(Modifier::BOLD),
+                            ),
+                            Span::styled(text, Style::default().fg(pctx.theme.foreground)),
+                        ]);
+                        Paragraph::new(line).render(Rect::new(rect.x, rect.y, rect.width, 1), buf);
+                    });
+                });
+            }
 
             let yaml_for_paint = yaml.clone();
             ctx.component(
@@ -1923,6 +1989,14 @@ fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                 .outline()
                 .size(ButtonSize::Large)
                 .on_press(|| Msg::OpenDirPicker),
+        )
+        .action(
+            "dry-run",
+            Button::new("✓ Dry-Run")
+                .outline()
+                .size(ButtonSize::Large)
+                .disabled(!is_connected || is_running)
+                .on_press(|| Msg::PreviewDryRun),
         )
         .action(
             "save",

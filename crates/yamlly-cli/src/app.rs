@@ -84,6 +84,7 @@ pub enum Msg {
     PreviewScrollChanged(u16),
     PreviewPathChanged(InputState),
     PreviewSave,
+    PreviewDryRun,
     OpenDirPicker,
     // Directory Picker modal
     DirPickerCursorChanged(String, usize),
@@ -580,6 +581,30 @@ impl App {
     }
 
     pub fn handle_kubectl_op_result(&mut self, res: KubectlOpResult) {
+        if let Some(running) = self.preview_modal.is_running_op
+            && running == res.op
+        {
+            self.preview_modal.is_running_op = None;
+            let status_msg = if res.ok {
+                res.stdout
+                    .lines()
+                    .next()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or("Server dry-run passed")
+                    .to_string()
+            } else {
+                res.stderr
+                    .lines()
+                    .next()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or("Server dry-run failed")
+                    .to_string()
+            };
+            self.preview_modal.last_status = Some((res.ok, status_msg));
+        }
+
         if res.ok {
             let summary = if res.no_changes {
                 "✓ Manifest matches live cluster resource".to_string()
@@ -1504,6 +1529,21 @@ impl App {
                     }
                 }
             }
+            Msg::PreviewDryRun => {
+                if !self.cluster_status.connected {
+                    self.notify_kind(
+                        "Cluster is disconnected — reconnect or switch context first",
+                        ToastKind::Warning,
+                    );
+                    return;
+                }
+                let yaml = self.preview_modal.yaml.clone();
+                if self.start_kubectl_op(KubectlOpKind::DryRunServer, yaml) {
+                    self.preview_modal.is_running_op = Some(KubectlOpKind::DryRunServer);
+                    self.preview_modal.last_status = None;
+                    self.notify_kind("Running server dry-run validation…", ToastKind::Loading);
+                }
+            }
             Msg::OpenDirPicker => {
                 let raw = self.preview_modal.path_input.value().trim();
                 let start = if raw.is_empty() {
@@ -1796,6 +1836,16 @@ impl App {
                 MODAL_DIR_PICKER if key.code == KeyCode::Backspace && !key.modifiers.any() => {
                     self.update(Msg::DirPickerUp);
                     return true;
+                }
+                MODAL_PREVIEW => {
+                    if !key.modifiers.any()
+                        && matches!(key.code, KeyCode::Char('d' | 'D'))
+                        && !self.focus.contains_path([MODAL_PREVIEW, "path-input"])
+                    {
+                        self.update(Msg::PreviewDryRun);
+                        return true;
+                    }
+                    return false;
                 }
                 _ => return false,
             }

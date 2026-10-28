@@ -11,6 +11,8 @@ use ratcn::InputState;
 use ratcn::runtime::ChildId;
 use yamlly_core::LeafFieldPath;
 
+use crate::k8s::KubectlOpKind;
+
 pub const MODAL_CONFIRM: &str = "confirm";
 pub const MODAL_FIELD_PICKER: &str = "field_picker";
 pub const MODAL_PREVIEW: &str = "preview";
@@ -619,6 +621,8 @@ pub struct PreviewModalState {
     pub filename: String,
     pub path_input: InputState,
     pub scroll: u16,
+    pub is_running_op: Option<KubectlOpKind>,
+    pub last_status: Option<(bool, String)>,
 }
 
 impl Default for PreviewModalState {
@@ -630,6 +634,8 @@ impl Default for PreviewModalState {
             filename,
             path_input: InputState::new(default_path),
             scroll: 0,
+            is_running_op: None,
+            last_status: None,
         }
     }
 }
@@ -662,6 +668,8 @@ impl PreviewModalState {
             filename: leaf_name,
             path_input: InputState::new(display_path),
             scroll: 0,
+            is_running_op: None,
+            last_status: None,
         }
     }
 

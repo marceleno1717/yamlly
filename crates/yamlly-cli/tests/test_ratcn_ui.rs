@@ -1323,3 +1323,82 @@ fn test_cluster_import_disabled_when_disconnected() {
         );
     }
 }
+
+#[test]
+fn test_preview_modal_dry_run_validation_flow() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+    app.open_resource("Deployment", None);
+    app.update(Msg::OpenPreview);
+    assert!(app.modals.is_open(MODAL_PREVIEW));
+
+    // Preview modal renders "✓ Dry-Run" button
+    let screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(
+        screen.contains("✓ Dry-Run"),
+        "preview modal must render '✓ Dry-Run' button:\n{screen}"
+    );
+
+    // Trigger server dry-run
+    app.update(Msg::PreviewDryRun);
+    assert!(app.preview_modal.is_running_op.is_some());
+
+    // Background runner finishes and updates status
+    app.poll_background();
+    assert!(app.preview_modal.is_running_op.is_none());
+    let status = app
+        .preview_modal
+        .last_status
+        .as_ref()
+        .expect("dry run status");
+    assert!(status.0, "status must be ok");
+    assert!(status.1.contains("server dry run"));
+
+    // Rendered frame shows status banner
+    let dry_screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(
+        dry_screen.contains("Server dry-run:"),
+        "screen must display dry run status banner:\n{dry_screen}"
+    );
+}
+
+#[test]
+fn test_preview_modal_dry_run_disabled_when_disconnected() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+    app.open_resource("Deployment", None);
+    app.cluster_status.connected = false;
+    app.update(Msg::OpenPreview);
+    assert!(app.modals.is_open(MODAL_PREVIEW));
+
+    // Clicking or updating dry run when disconnected warns and does not start operation
+    app.update(Msg::PreviewDryRun);
+    assert!(
+        app.preview_modal.is_running_op.is_none(),
+        "dry-run must not start when disconnected"
+    );
+    assert!(
+        app.active_toast()
+            .unwrap_or("")
+            .contains("Cluster is disconnected"),
+        "warning toast must notify of disconnected cluster"
+    );
+
+    // Clicking disabled button via mouse does nothing
+    let screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    if let Some((y, line)) = screen
+        .lines()
+        .enumerate()
+        .find(|(_, l)| l.contains("✓ Dry-Run"))
+    {
+        let x = line
+            .find("✓ Dry-Run")
+            .map(|b| line[..b].chars().count() as u16)
+            .unwrap();
+        send_click(&mut ratcn, &mut app, x, y as u16);
+        assert!(
+            app.preview_modal.is_running_op.is_none(),
+            "clicking disabled dry-run button must not run op"
+        );
+    }
+}
