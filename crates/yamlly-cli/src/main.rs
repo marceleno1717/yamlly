@@ -21,9 +21,7 @@ fn main() -> io::Result<()> {
                 println!(
                     "  yamlly | ymly --list          List all supported Kubernetes resource kinds"
                 );
-                println!(
-                    "  yamlly | ymly --emit <KIND>   Print a starter YAML manifest for KIND"
-                );
+                println!("  yamlly | ymly --emit <KIND>   Print a starter YAML manifest for KIND");
                 println!("  yamlly | ymly --version       Print version information");
                 return Ok(());
             }
