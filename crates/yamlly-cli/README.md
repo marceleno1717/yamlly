@@ -9,6 +9,10 @@
     <a href="https://www.npmjs.com/package/yamlly-cli"><img src="https://img.shields.io/npm/v/yamlly-cli" alt="npm version"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial-blue.svg" alt="License"></a>
   </p>
+
+  <p>
+    <img src="https://raw.githubusercontent.com/marceleno1717/yamlly/main/assets/demo.svg" alt="yamlly interactive TUI demo" width="100%">
+  </p>
 </div>
 
 ---
@@ -35,6 +39,10 @@ Installing `yamlly-cli` from any registry provides both the **`yamlly`** and **`
 ### Option A: Cargo (Rust)
 
 ```bash
+# Fast binary install via cargo-binstall (~1s)
+cargo binstall yamlly-cli
+
+# Or compile from source
 cargo install yamlly-cli
 ```
 

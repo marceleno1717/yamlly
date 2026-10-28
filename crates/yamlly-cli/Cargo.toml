@@ -23,6 +23,19 @@ path = "src/main.rs"
 name = "ymly"
 path = "src/bin/ymly.rs"
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/yamlly-{ target }{ binary-ext }"
+pkg-fmt = "bin"
+
+[package.metadata.binstall.overrides.x86_64-unknown-linux-gnu]
+pkg-url = "{ repo }/releases/download/v{ version }/yamlly-linux-x64"
+
+[package.metadata.binstall.overrides.aarch64-apple-darwin]
+pkg-url = "{ repo }/releases/download/v{ version }/yamlly-darwin-arm64"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-url = "{ repo }/releases/download/v{ version }/yamlly-win32-x64.exe"
+
 [dependencies]
 yamlly-core.workspace = true
 serde_json = { version = "1.0", features = ["preserve_order"] }
