@@ -18,8 +18,8 @@ use crate::modals::{
     ClusterImportModalState, ConfirmKind, ConfirmModalState, ContextSwitcherModalState,
     DirPickerModalState, FieldPickerModalState, MODAL_CLUSTER_IMPORT, MODAL_CONFIRM,
     MODAL_CONTEXT_SWITCHER, MODAL_DIR_PICKER, MODAL_FIELD_PICKER, MODAL_MAP_EDITOR, MODAL_PREVIEW,
-    MODAL_SELECT_PICKER, MapEditorModalState, PreviewModalState, SELECT_UNSET_VALUE,
-    SelectPickerModalState,
+    MODAL_SELECT_PICKER, MapEditorModalState, PreviewModalState, PreviewViewMode,
+    SELECT_UNSET_VALUE, SelectPickerModalState,
 };
 
 #[derive(Debug)]
@@ -82,9 +82,12 @@ pub enum Msg {
     FieldPickerCommit,
     // YAML Preview & Save modal
     PreviewScrollChanged(u16),
+    PreviewDiffScrollChanged(u16),
     PreviewPathChanged(InputState),
     PreviewSave,
     PreviewDryRun,
+    PreviewDiff,
+    PreviewToggleView(Option<PreviewViewMode>),
     OpenDirPicker,
     // Directory Picker modal
     DirPickerCursorChanged(String, usize),
@@ -666,14 +669,40 @@ impl App {
         {
             self.preview_modal.is_running_op = None;
             let status_msg = if res.ok {
-                res.stdout
-                    .lines()
-                    .next()
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                    .unwrap_or("Server dry-run passed")
-                    .to_string()
+                if res.op == KubectlOpKind::Diff {
+                    let diff_text = if res.no_changes {
+                        "✓ No differences — manifest matches live cluster resource.".to_string()
+                    } else if res.stdout.trim().is_empty() {
+                        "✓ No differences found.".to_string()
+                    } else {
+                        res.stdout.clone()
+                    };
+                    self.preview_modal.diff_output = Some(diff_text);
+                    self.preview_modal.view_mode = PreviewViewMode::Diff;
+                    self.preview_modal.diff_scroll = 0;
+                    if res.no_changes {
+                        "No differences — manifest matches live cluster resource".to_string()
+                    } else {
+                        "Live cluster diff ready".to_string()
+                    }
+                } else {
+                    res.stdout
+                        .lines()
+                        .next()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or("Server dry-run passed")
+                        .to_string()
+                }
             } else {
+                if res.op == KubectlOpKind::Diff {
+                    self.preview_modal.diff_output = Some(format!(
+                        "✕ Failed to compute diff against live cluster resource:\n{}",
+                        res.stderr
+                    ));
+                    self.preview_modal.view_mode = PreviewViewMode::Diff;
+                    self.preview_modal.diff_scroll = 0;
+                }
                 res.stderr
                     .lines()
                     .next()
@@ -1637,6 +1666,9 @@ impl App {
             Msg::PreviewScrollChanged(offset) => {
                 self.preview_modal.scroll = offset;
             }
+            Msg::PreviewDiffScrollChanged(offset) => {
+                self.preview_modal.diff_scroll = offset;
+            }
             Msg::PreviewPathChanged(state) => {
                 self.preview_modal.path_input = state;
             }
@@ -1688,6 +1720,32 @@ impl App {
                     self.preview_modal.is_running_op = Some(KubectlOpKind::DryRunServer);
                     self.preview_modal.last_status = None;
                     self.notify_kind("Running server dry-run validation…", ToastKind::Loading);
+                }
+            }
+            Msg::PreviewDiff => {
+                if !self.cluster_status.connected {
+                    self.notify_kind(
+                        "Cluster is disconnected — reconnect or switch context first",
+                        ToastKind::Warning,
+                    );
+                    return;
+                }
+                self.preview_modal.view_mode = PreviewViewMode::Diff;
+                let yaml = self.preview_modal.yaml.clone();
+                if self.start_kubectl_op(KubectlOpKind::Diff, yaml) {
+                    self.preview_modal.is_running_op = Some(KubectlOpKind::Diff);
+                    self.preview_modal.last_status = None;
+                    self.notify_kind("Computing live cluster diff…", ToastKind::Loading);
+                }
+            }
+            Msg::PreviewToggleView(target) => {
+                let next_mode = target.unwrap_or(match self.preview_modal.view_mode {
+                    PreviewViewMode::Yaml => PreviewViewMode::Diff,
+                    PreviewViewMode::Diff => PreviewViewMode::Yaml,
+                });
+                self.preview_modal.view_mode = next_mode;
+                if next_mode == PreviewViewMode::Diff && self.preview_modal.diff_output.is_none() {
+                    self.update(Msg::PreviewDiff);
                 }
             }
             Msg::OpenDirPicker => {
@@ -1990,11 +2048,27 @@ impl App {
                 }
                 MODAL_PREVIEW => {
                     if !key.modifiers.any()
-                        && matches!(key.code, KeyCode::Char('d' | 'D'))
                         && !self.focus.contains_path([MODAL_PREVIEW, "path-input"])
                     {
-                        self.update(Msg::PreviewDryRun);
-                        return true;
+                        match key.code {
+                            KeyCode::Char('d' | 'D') => {
+                                self.update(Msg::PreviewDryRun);
+                                return true;
+                            }
+                            KeyCode::Char('f' | 'F') => {
+                                self.update(Msg::PreviewToggleView(Some(PreviewViewMode::Diff)));
+                                return true;
+                            }
+                            KeyCode::Char('y' | 'Y') => {
+                                self.update(Msg::PreviewToggleView(Some(PreviewViewMode::Yaml)));
+                                return true;
+                            }
+                            KeyCode::Tab => {
+                                self.update(Msg::PreviewToggleView(None));
+                                return true;
+                            }
+                            _ => return false,
+                        }
                     }
                     return false;
                 }

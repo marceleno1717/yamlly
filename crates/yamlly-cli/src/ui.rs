@@ -34,7 +34,7 @@ use crate::k8s::extract_map_from_cluster_item;
 use crate::modals::{
     ClusterImportModalState, FIELD_PICKER_GROUP_PREFIX, FieldPickerRow, MODAL_CLUSTER_IMPORT,
     MODAL_CONFIRM, MODAL_CONTEXT_SWITCHER, MODAL_DIR_PICKER, MODAL_FIELD_PICKER, MODAL_MAP_EDITOR,
-    MODAL_PREVIEW, MODAL_SELECT_PICKER, SELECT_UNSET_VALUE,
+    MODAL_PREVIEW, MODAL_SELECT_PICKER, PreviewViewMode, SELECT_UNSET_VALUE,
 };
 
 /// Construct the configured `Ratcn` runtime bound to [`App::focus`] and [`App::modals`].
@@ -109,6 +109,29 @@ pub fn handle_event(ratcn: &mut Ratcn<App, Msg>, app: &mut App, event: Event) ->
                     KeyCode::Down => {
                         app.context_switcher_modal.select_next(true);
                         app.ui_dirty = true;
+                        return true;
+                    }
+                    _ => {}
+                }
+            }
+            if app.modals.top().map(|m| m.as_str()) == Some(MODAL_PREVIEW)
+                && !app.focus.contains_path([MODAL_PREVIEW, "path-input"])
+            {
+                match key.code {
+                    KeyCode::Char('d' | 'D') => {
+                        app.update(Msg::PreviewDryRun);
+                        return true;
+                    }
+                    KeyCode::Char('f' | 'F') => {
+                        app.update(Msg::PreviewToggleView(Some(
+                            crate::modals::PreviewViewMode::Diff,
+                        )));
+                        return true;
+                    }
+                    KeyCode::Char('y' | 'Y') => {
+                        app.update(Msg::PreviewToggleView(Some(
+                            crate::modals::PreviewViewMode::Yaml,
+                        )));
                         return true;
                     }
                     _ => {}
@@ -1904,7 +1927,11 @@ fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
     let line_count = (yaml.lines().count() as u16).max(1);
     let is_connected = ctx.state().cluster_status.connected;
     let is_running = ctx.state().preview_modal.is_running_op.is_some();
+    let running_op = ctx.state().preview_modal.is_running_op;
     let last_status = ctx.state().preview_modal.last_status.clone();
+    let view_mode = ctx.state().preview_modal.view_mode;
+    let is_diff_view = view_mode == PreviewViewMode::Diff;
+    let diff_output = ctx.state().preview_modal.diff_output.clone();
     let context_name = ctx
         .state()
         .cluster_status
@@ -1928,19 +1955,21 @@ fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
             } else {
                 0u16
             };
-            let scroll_h = body.height.saturating_sub(4 + banner_h);
+            let tab_bar_h = if body.height >= 12 { 2u16 } else { 0u16 };
+            let scroll_h = body.height.saturating_sub(4 + banner_h + tab_bar_h);
             let banner_rect = Rect::new(body.x, body.y, body.width, banner_h);
-            let yaml_rect = Rect::new(
+            let content_rect = Rect::new(
                 body.x,
-                body.y.saturating_add(banner_h),
+                body.y.saturating_add(banner_h).saturating_add(tab_bar_h),
                 body.width,
                 scroll_h,
             );
-            // 1 blank row of spacing between YAML scroll area and path Input
+            // 1 blank row of spacing between content scroll area and path Input
             let path_rect = Rect::new(
                 body.x,
                 body.y
                     .saturating_add(banner_h)
+                    .saturating_add(tab_bar_h)
                     .saturating_add(scroll_h)
                     .saturating_add(1),
                 body.width,
@@ -1952,24 +1981,28 @@ fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                 let ctx_name = context_name.clone();
                 ctx.paint(move |pctx| {
                     let (icon, text, fg) = if is_running {
-                        (
-                            "◌",
-                            format!("Running server dry-run validation against {ctx_name}…"),
-                            pctx.theme.warning,
-                        )
+                        let msg = match running_op {
+                            Some(crate::k8s::KubectlOpKind::Diff) => {
+                                format!("Computing live cluster diff against {ctx_name}…")
+                            }
+                            _ => format!("Running server dry-run validation against {ctx_name}…"),
+                        };
+                        ("◌", msg, pctx.theme.warning)
                     } else if let Some((ok, msg)) = &status_val {
                         if *ok {
-                            (
-                                "✓",
-                                format!("Server dry-run: {msg}"),
-                                Color::Rgb(74, 222, 128),
-                            )
+                            let text = if is_diff_view {
+                                format!("Cluster diff: {msg}")
+                            } else {
+                                format!("Server dry-run: {msg}")
+                            };
+                            ("✓", text, Color::Rgb(74, 222, 128))
                         } else {
-                            (
-                                "✕",
-                                format!("Server dry-run failed: {msg}"),
-                                pctx.theme.destructive,
-                            )
+                            let text = if is_diff_view {
+                                format!("Cluster diff failed: {msg}")
+                            } else {
+                                format!("Server dry-run failed: {msg}")
+                            };
+                            ("✕", text, pctx.theme.destructive)
                         }
                     } else {
                         ("", String::new(), pctx.theme.foreground)
@@ -1989,23 +2022,90 @@ fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                 });
             }
 
-            let yaml_for_paint = yaml.clone();
-            ctx.component(
-                "yaml-scroll",
-                ScrollArea::new(line_count)
-                    .scroll(
-                        |app: &App| app.preview_modal.scroll,
-                        Msg::PreviewScrollChanged,
-                    )
-                    .content(move |ctx| {
-                        let content_area = ctx.area();
-                        let yaml_owned = yaml_for_paint.clone();
-                        ctx.paint(move |pctx| {
-                            paint_highlighted_yaml(pctx, content_area, &yaml_owned);
-                        });
-                    }),
-                yaml_rect,
-            );
+            if tab_bar_h > 0 {
+                let tab_w = 13u16;
+                let btn_yaml_rect = Rect::new(body.x, body.y.saturating_add(banner_h), tab_w, 1);
+                let btn_diff_rect = Rect::new(
+                    body.x.saturating_add(tab_w).saturating_add(1),
+                    body.y.saturating_add(banner_h),
+                    tab_w,
+                    1,
+                );
+
+                let mut btn_yaml = Button::new("📄 YAML").size(ButtonSize::Small).on_press(|| {
+                    Msg::PreviewToggleView(Some(PreviewViewMode::Yaml))
+                });
+                if is_diff_view {
+                    btn_yaml = btn_yaml.outline();
+                }
+                ctx.component("btn-view-yaml", btn_yaml, btn_yaml_rect);
+
+                let mut btn_diff = Button::new("± Diff").size(ButtonSize::Small).on_press(|| {
+                    Msg::PreviewToggleView(Some(PreviewViewMode::Diff))
+                });
+                if !is_diff_view {
+                    btn_diff = btn_diff.outline();
+                }
+                ctx.component("btn-view-diff", btn_diff, btn_diff_rect);
+
+                let hint_x = body.x.saturating_add(tab_w * 2 + 3);
+                let hint_rect = Rect::new(
+                    hint_x,
+                    body.y.saturating_add(banner_h),
+                    body.width.saturating_sub(hint_x.saturating_sub(body.x)),
+                    1,
+                );
+                ctx.paint(move |pctx| {
+                    pctx.with_buffer(hint_rect, |rect, buf| {
+                        let hint = Line::from(vec![Span::styled(
+                            "Tab / f / y to switch view",
+                            Style::default().fg(pctx.theme.muted_foreground),
+                        )]);
+                        Paragraph::new(hint).render(rect, buf);
+                    });
+                });
+            }
+
+            if is_diff_view {
+                let diff_text = diff_output.unwrap_or_else(|| {
+                    "No diff computed yet.\nClick '± Diff' or press 'f' to compare against the live cluster resource.".to_string()
+                });
+                let diff_lines = (diff_text.lines().count() as u16).max(1);
+                ctx.component(
+                    "diff-scroll",
+                    ScrollArea::new(diff_lines)
+                        .scroll(
+                            |app: &App| app.preview_modal.diff_scroll,
+                            Msg::PreviewDiffScrollChanged,
+                        )
+                        .content(move |ctx| {
+                            let content_area = ctx.area();
+                            let diff_owned = diff_text.clone();
+                            ctx.paint(move |pctx| {
+                                paint_highlighted_diff(pctx, content_area, &diff_owned);
+                            });
+                        }),
+                    content_rect,
+                );
+            } else {
+                let yaml_for_paint = yaml.clone();
+                ctx.component(
+                    "yaml-scroll",
+                    ScrollArea::new(line_count)
+                        .scroll(
+                            |app: &App| app.preview_modal.scroll,
+                            Msg::PreviewScrollChanged,
+                        )
+                        .content(move |ctx| {
+                            let content_area = ctx.area();
+                            let yaml_owned = yaml_for_paint.clone();
+                            ctx.paint(move |pctx| {
+                                paint_highlighted_yaml(pctx, content_area, &yaml_owned);
+                            });
+                        }),
+                    content_rect,
+                );
+            }
 
             ctx.component(
                 "path-input",
@@ -2042,6 +2142,14 @@ fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                 .size(ButtonSize::Large)
                 .disabled(!is_connected || is_running)
                 .on_press(|| Msg::PreviewDryRun),
+        )
+        .action(
+            "diff",
+            Button::new("± Diff")
+                .outline()
+                .size(ButtonSize::Large)
+                .disabled(!is_connected || is_running)
+                .on_press(|| Msg::PreviewDiff),
         )
         .action(
             "save",
@@ -2087,6 +2195,54 @@ fn paint_highlighted_yaml(pctx: &mut PaintCtx<'_, App>, area: Rect, yaml: &str) 
                 ));
             }
             Line::from(spans)
+        })
+        .collect();
+
+    pctx.with_buffer(area, |rect, buf| {
+        buf.set_style(rect, Style::default().bg(well_bg));
+        Paragraph::new(lines).render(rect, buf);
+    });
+}
+
+fn paint_highlighted_diff(pctx: &mut PaintCtx<'_, App>, area: Rect, diff: &str) {
+    let muted = pctx.theme.muted_foreground;
+    let add_color = Color::Rgb(74, 222, 128); // Green
+    let del_color = pctx.theme.destructive; // Red
+    let hunk_color = pctx.theme.accent; // Cyan/Accent
+    let header_color = pctx.theme.primary; // Primary
+    let well_bg = pctx.theme.field;
+
+    let lines: Vec<Line<'static>> = diff
+        .lines()
+        .enumerate()
+        .map(|(i, raw_line)| {
+            let line_no = format!("{:>3} │ ", i + 1);
+            let no_span = Span::styled(line_no, Style::default().fg(muted));
+
+            let line_style = if raw_line.starts_with("+++") || raw_line.starts_with("---") {
+                Style::default()
+                    .fg(header_color)
+                    .add_modifier(Modifier::BOLD)
+            } else if raw_line.starts_with('+') {
+                Style::default().fg(add_color)
+            } else if raw_line.starts_with('-') {
+                Style::default().fg(del_color)
+            } else if raw_line.starts_with("@@") {
+                Style::default().fg(hunk_color).add_modifier(Modifier::BOLD)
+            } else if raw_line.starts_with("diff ") || raw_line.starts_with("index ") {
+                Style::default().fg(muted).add_modifier(Modifier::DIM)
+            } else if raw_line.starts_with('✓') {
+                Style::default().fg(add_color).add_modifier(Modifier::BOLD)
+            } else if raw_line.starts_with('✕') {
+                Style::default().fg(del_color).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(pctx.theme.foreground)
+            };
+
+            Line::from(vec![
+                no_span,
+                Span::styled(raw_line.to_string(), line_style),
+            ])
         })
         .collect();
 

@@ -614,6 +614,14 @@ pub fn resolve_abs_dir(path: &Path) -> PathBuf {
     default_save_dir()
 }
 
+/// Active view mode inside the Preview modal: raw YAML manifest or live cluster unified Diff.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PreviewViewMode {
+    #[default]
+    Yaml,
+    Diff,
+}
+
 /// State for the YAML Preview & Save [`ratcn::Dialog`].
 #[derive(Clone)]
 pub struct PreviewModalState {
@@ -623,6 +631,9 @@ pub struct PreviewModalState {
     pub scroll: u16,
     pub is_running_op: Option<KubectlOpKind>,
     pub last_status: Option<(bool, String)>,
+    pub view_mode: PreviewViewMode,
+    pub diff_output: Option<String>,
+    pub diff_scroll: u16,
 }
 
 impl Default for PreviewModalState {
@@ -636,6 +647,9 @@ impl Default for PreviewModalState {
             scroll: 0,
             is_running_op: None,
             last_status: None,
+            view_mode: PreviewViewMode::Yaml,
+            diff_output: None,
+            diff_scroll: 0,
         }
     }
 }
@@ -670,6 +684,9 @@ impl PreviewModalState {
             scroll: 0,
             is_running_op: None,
             last_status: None,
+            view_mode: PreviewViewMode::Yaml,
+            diff_output: None,
+            diff_scroll: 0,
         }
     }
 

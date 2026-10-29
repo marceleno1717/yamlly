@@ -1445,3 +1445,143 @@ fn test_refresh_button_ui_and_namespace_import() {
         "ClusterImportModal must list production namespace:\n{ci_screen}"
     );
 }
+
+#[test]
+fn test_preview_modal_diff_flow_and_view_toggle() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+    app.open_resource("Deployment", None);
+    app.update(Msg::OpenPreview);
+    assert!(app.modals.is_open(MODAL_PREVIEW));
+
+    // Preview modal renders view mode tabs and "± Diff" button
+    let screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(
+        screen.contains("± Diff"),
+        "preview modal must render '± Diff' button:\n{screen}"
+    );
+    assert!(
+        screen.contains("YAML"),
+        "preview modal must render 'YAML' view tab:\n{screen}"
+    );
+    assert_eq!(
+        app.preview_modal.view_mode,
+        yamlly::modals::PreviewViewMode::Yaml
+    );
+
+    // Trigger cluster diff
+    app.update(Msg::PreviewDiff);
+    assert!(app.preview_modal.is_running_op.is_some());
+
+    // Background runner finishes and populates diff_output
+    app.poll_background();
+    assert!(app.preview_modal.is_running_op.is_none());
+    assert_eq!(
+        app.preview_modal.view_mode,
+        yamlly::modals::PreviewViewMode::Diff
+    );
+    let diff = app
+        .preview_modal
+        .diff_output
+        .as_ref()
+        .expect("diff output should be populated");
+    assert!(diff.contains("--- LIVE") && diff.contains("+++ MERGED"));
+
+    // Rendered frame shows diff content and hunk lines
+    let diff_screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(
+        diff_screen.contains("-  replicas: 1") && diff_screen.contains("+  replicas: 3"),
+        "diff view must display added and removed lines:\n{diff_screen}"
+    );
+
+    // Switch back to YAML view via Msg::PreviewToggleView
+    app.update(Msg::PreviewToggleView(Some(
+        yamlly::modals::PreviewViewMode::Yaml,
+    )));
+    assert_eq!(
+        app.preview_modal.view_mode,
+        yamlly::modals::PreviewViewMode::Yaml
+    );
+    let yaml_screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(
+        yaml_screen.contains("apiVersion: apps/v1"),
+        "YAML view must show manifest:\n{yaml_screen}"
+    );
+
+    // Focus view tab and send 'f' shortcut to switch to Diff view
+    app.focus = FocusState::intent([MODAL_PREVIEW, "btn-view-yaml"]);
+    send_key(&mut ratcn, &mut app, KeyCode::Char('f'));
+    assert_eq!(
+        app.preview_modal.view_mode,
+        yamlly::modals::PreviewViewMode::Diff,
+        "'f' key must toggle to Diff view"
+    );
+
+    // Shortcut 'y' switches back to YAML view
+    send_key(&mut ratcn, &mut app, KeyCode::Char('y'));
+    assert_eq!(
+        app.preview_modal.view_mode,
+        yamlly::modals::PreviewViewMode::Yaml,
+        "'y' key must toggle to YAML view"
+    );
+
+    // Clicking '± Diff' button in the toolbar switches view mode
+    let screen_buttons = render_frame(&mut ratcn, &mut app, 140, 36);
+    if let Some((y, line)) = screen_buttons
+        .lines()
+        .enumerate()
+        .find(|(_, l)| l.contains("± Diff"))
+    {
+        let x = line
+            .find("± Diff")
+            .map(|b| line[..b].chars().count() as u16)
+            .unwrap();
+        send_click(&mut ratcn, &mut app, x, y as u16);
+        assert_eq!(
+            app.preview_modal.view_mode,
+            yamlly::modals::PreviewViewMode::Diff,
+            "clicking '± Diff' must toggle view mode to Diff"
+        );
+    }
+}
+
+#[test]
+fn test_preview_modal_diff_disabled_when_disconnected() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+    app.open_resource("Deployment", None);
+    app.cluster_status.connected = false;
+    app.update(Msg::OpenPreview);
+    assert!(app.modals.is_open(MODAL_PREVIEW));
+
+    // Triggering diff when disconnected warns and does not start operation
+    app.update(Msg::PreviewDiff);
+    assert!(
+        app.preview_modal.is_running_op.is_none(),
+        "diff must not start when disconnected"
+    );
+    assert!(
+        app.active_toast()
+            .unwrap_or("")
+            .contains("Cluster is disconnected"),
+        "warning toast must notify of disconnected cluster"
+    );
+
+    // Clicking disabled button via mouse does nothing
+    let screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    if let Some((y, line)) = screen
+        .lines()
+        .enumerate()
+        .find(|(_, l)| l.contains("± Diff"))
+    {
+        let x = line
+            .find("± Diff")
+            .map(|b| line[..b].chars().count() as u16)
+            .unwrap();
+        send_click(&mut ratcn, &mut app, x, y as u16);
+        assert!(
+            app.preview_modal.is_running_op.is_none(),
+            "clicking disabled diff button must not run op"
+        );
+    }
+}
