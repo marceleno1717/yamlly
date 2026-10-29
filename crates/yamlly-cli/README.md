@@ -27,10 +27,16 @@ Pick a resource, fill in the fields you need, search and mount optional properti
 
 - 🏗️ **22 Embedded Kubernetes Schemas**: Zero external runtime files required (`Deployment`, `Pod`, `Service`, `Ingress`, `ConfigMap`, `Secret`, `StatefulSet`, `DaemonSet`, `Job`, `CronJob`, `PersistentVolume`, `PersistentVolumeClaim`, `HorizontalPodAutoscaler`, `NetworkPolicy`, `Role`, `ClusterRole`, `RoleBinding`, `ClusterRoleBinding`, `ServiceAccount`, `Namespace`, `ResourceQuota`, `LimitRange`).
 - 🔍 **Interactive Field Picker (`+ Fields`)**: Search and mount individual optional fields or entire nested categories into your form, and remove added fields/categories anytime (`[ ✕ ]` or `Ctrl+D`).
-- ☸️ **Live Cluster Integration (`Ctrl+I` / `Ctrl+K`)**: Switch Kubernetes contexts, inspect live namespaces, and import full manifests or label/selector maps directly from a running cluster.
+- ☸️ **Live Cluster Integration & Workflows**:
+  - **Server-Side Dry-Run (`d`)**: Validate manifests against admission webhooks and API schemas via `kubectl apply --dry-run=server` before saving.
+  - **Live Cluster Diff (`f`)**: Inspect colorized unified diffs (`+` / `-` / `@@`) between your edited manifest and deployed cluster resources.
+  - **Guarded Cluster Apply (`a`)**: Deploy manifests directly to your active cluster with an interactive safety confirmation guard.
+  - **Cluster Import with Namespace Dropdown**: Switch contexts (`Ctrl+K` / `c`), refresh namespaces, and import live resources from any namespace with session persistence.
+- 🔐 **Secret Data Base64 / Plain Text Toggle**: Switch effortlessly between Base64 and decoded plain text when editing Secret `data`, with automatic Base64 encoding when applied.
 - 🗂️ **Multi-Tab Workspace**: Edit multiple resources simultaneously with per-tab dirty tracking (`●`) and unsaved-change protection.
 - 👁️ **Live YAML Preview & Filesystem Browser (`Ctrl+S` / `p`)**: Preview syntax-highlighted YAML and save to any relative or absolute path with an interactive directory picker.
 - 🎨 **Multiple Built-in Themes (`t`)**: Cycle through curated terminal color palettes on the fly.
+- 🛡️ **Clean Diagnostics**: Sanitizes noisy client-go / klog stack traces into actionable, friendly error messages.
 
 ## 🚀 Installation
 
@@ -86,6 +92,11 @@ yamlly --emit Deployment # Emit a starter YAML manifest to stdout
 | `Ctrl+K` / `c` | Open Kubernetes Context Switcher |
 | `Ctrl+V` | Validate active resource form |
 | `Ctrl+S` / `p` | Open YAML Preview & Save dialog |
+| `d` *(in Preview)* | Run server-side dry-run validation (`kubectl apply --dry-run=server`) |
+| `f` *(in Preview)* | Toggle live cluster diff view (`kubectl diff`) |
+| `y` *(in Preview)* | Switch back to YAML manifest view |
+| `a` *(in Preview)* | Apply manifest to active cluster (`kubectl apply`) |
+| `Ctrl+E` / `Ctrl+B` *(in Secret Map)* | Toggle Base64 ↔ Plain text editing mode |
 | `Ctrl+W` | Close active tab |
 | `t` | Cycle color theme |
 | `q` | Quit application |
