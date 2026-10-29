@@ -110,6 +110,9 @@ pub enum Msg {
     ClusterImportKindSelected(String),
     ClusterImportFilterChanged(InputState),
     ClusterImportRefresh,
+    ClusterImportNamespaceOpen(bool),
+    ClusterImportNamespaceSelected(String),
+    ClusterImportNamespaceCursorChanged(String),
     ClusterImportCursorChanged(String, usize),
     ClusterImportCommit(String),
     ClusterImportCommitSelected,
@@ -139,6 +142,8 @@ pub struct App {
     pub focused_resource_kind: Option<String>,
     pub cluster_status: ClusterStatus,
     pub cluster_namespaces: Vec<String>,
+    /// Default namespace for cluster import queries (persists across modal openings until app exit).
+    pub cluster_import_namespace: String,
     pub cluster_rx: Option<Receiver<ClusterStatus>>,
     pub cluster_fetch_rx: Option<Receiver<ClusterFetchResult>>,
     pub kubectl_op_rx: Option<Receiver<KubectlOpResult>>,
@@ -202,6 +207,7 @@ impl App {
                 "kube-system".to_string(),
                 "kube-public".to_string(),
             ],
+            cluster_import_namespace: "default".to_string(),
             cluster_rx: Some(rx),
             cluster_fetch_rx: None,
             kubectl_op_rx: None,
@@ -373,6 +379,28 @@ impl App {
                         }
                     }
                 }),
+                serde_json::json!({
+                    "apiVersion": "apps/v1",
+                    "kind": "Deployment",
+                    "metadata": {
+                        "name": "prod-api",
+                        "namespace": "production",
+                        "labels": {
+                            "app": "prod-api",
+                            "env": "production"
+                        }
+                    },
+                    "spec": {
+                        "replicas": 5,
+                        "template": {
+                            "metadata": {
+                                "labels": {
+                                    "app": "prod-api"
+                                }
+                            }
+                        }
+                    }
+                }),
             ],
         );
         mock.insert(
@@ -462,6 +490,7 @@ impl App {
                 "kube-system".to_string(),
                 "production".to_string(),
             ],
+            cluster_import_namespace: "default".to_string(),
             cluster_rx: None,
             cluster_fetch_rx: None,
             kubectl_op_rx: None,
@@ -1316,18 +1345,48 @@ impl App {
     pub fn trigger_cluster_fetch(&mut self, kind: &str) {
         self.cluster_import_modal.selected_kind = kind.to_string();
         self.cluster_import_modal.is_fetching = true;
-        self.cluster_import_modal.status_message = format!("Fetching {kind}s from cluster...");
+
+        let is_cluster_scoped = kind.eq_ignore_ascii_case("namespace")
+            || kind.eq_ignore_ascii_case("node")
+            || kind.eq_ignore_ascii_case("clusterrole")
+            || kind.eq_ignore_ascii_case("clusterrolebinding")
+            || kind.eq_ignore_ascii_case("customresourcedefinition")
+            || kind.eq_ignore_ascii_case("persistentvolume")
+            || kind.eq_ignore_ascii_case("storageclass");
+
+        if is_cluster_scoped {
+            self.cluster_import_modal.status_message = format!("Fetching {kind}s from cluster...");
+        } else {
+            self.cluster_import_modal.status_message = format!(
+                "Fetching {kind}s in '{}' from cluster...",
+                self.cluster_import_namespace
+            );
+        }
         self.cluster_import_modal.items.clear();
         self.cluster_import_modal.cursor = None;
 
         if let Some(mock) = &self.mock_cluster_resources {
-            let items = mock.get(kind).cloned().unwrap_or_default();
+            let mut items = mock.get(kind).cloned().unwrap_or_default();
+            if !is_cluster_scoped {
+                items.retain(|item| {
+                    item.pointer("/metadata/namespace")
+                        .and_then(|v| v.as_str())
+                        .map(|ns| ns == self.cluster_import_namespace)
+                        .unwrap_or(false)
+                });
+            }
             self.cluster_import_modal.set_items(items, None);
             return;
         }
 
+        let ns = if is_cluster_scoped {
+            None
+        } else {
+            Some(self.cluster_import_namespace.clone())
+        };
+
         let (tx, rx) = channel();
-        fetch_cluster_resources_async(kind.to_string(), None, tx);
+        fetch_cluster_resources_async(kind.to_string(), ns, tx);
         self.cluster_fetch_rx = Some(rx);
     }
 
@@ -1924,6 +1983,23 @@ impl App {
                 let kind = self.cluster_import_modal.selected_kind.clone();
                 self.trigger_cluster_fetch(&kind);
             }
+            Msg::ClusterImportNamespaceOpen(open) => {
+                self.cluster_import_modal.namespace_open = open;
+                self.ui_dirty = true;
+            }
+            Msg::ClusterImportNamespaceSelected(ns) => {
+                if self.cluster_import_namespace != ns {
+                    self.cluster_import_namespace = ns;
+                    let kind = self.cluster_import_modal.selected_kind.clone();
+                    self.trigger_cluster_fetch(&kind);
+                }
+                self.cluster_import_modal.namespace_open = false;
+                self.ui_dirty = true;
+            }
+            Msg::ClusterImportNamespaceCursorChanged(ns) => {
+                self.cluster_import_modal.namespace_cursor = Some(ns);
+                self.ui_dirty = true;
+            }
             Msg::ClusterImportFilterChanged(state) => {
                 self.cluster_import_modal.filter = state;
                 let filtered = self.cluster_import_modal.filtered_indices();
@@ -2042,6 +2118,13 @@ impl App {
         // When a modal is open, only modal-level fallbacks apply.
         if let Some(top_modal) = self.modals.top().cloned() {
             if key.code == KeyCode::Esc && !key.modifiers.any() {
+                if top_modal.as_str() == MODAL_CLUSTER_IMPORT
+                    && self.cluster_import_modal.namespace_open
+                {
+                    self.cluster_import_modal.namespace_open = false;
+                    self.ui_dirty = true;
+                    return true;
+                }
                 self.close_modal();
                 return true;
             }

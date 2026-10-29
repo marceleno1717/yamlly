@@ -970,6 +970,10 @@ pub struct ClusterImportModalState {
     pub into_map_modal: bool,
     /// Currently selected cluster resource kind (`"Deployment"`, `"Pod"`, `"Service"`, etc.).
     pub selected_kind: String,
+    /// Whether the namespace dropdown panel is currently open.
+    pub namespace_open: bool,
+    /// Option cursor in the namespace dropdown panel.
+    pub namespace_cursor: Option<String>,
     /// Live search filter input for resource name/namespace.
     pub filter: InputState,
     /// True while an async `kubectl get <kind> -o json` request is in flight.
@@ -988,6 +992,8 @@ impl Default for ClusterImportModalState {
             target_path: Some("metadata.labels".to_string()),
             into_map_modal: false,
             selected_kind: "Deployment".to_string(),
+            namespace_open: false,
+            namespace_cursor: None,
             filter: InputState::default(),
             is_fetching: false,
             status_message: String::new(),
@@ -1017,6 +1023,8 @@ impl ClusterImportModalState {
             target_path: Some(path.to_string()),
             into_map_modal,
             selected_kind: "Deployment".to_string(),
+            namespace_open: false,
+            namespace_cursor: None,
             filter: InputState::default(),
             is_fetching: true,
             status_message: "Fetching Deployments from cluster...".to_string(),
@@ -1036,6 +1044,8 @@ impl ClusterImportModalState {
             into_map_modal: false,
             status_message: format!("Fetching {kind}s from cluster..."),
             selected_kind: kind,
+            namespace_open: false,
+            namespace_cursor: None,
             filter: InputState::default(),
             is_fetching: true,
             items: Vec::new(),

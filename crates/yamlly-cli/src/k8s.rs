@@ -513,7 +513,9 @@ pub fn get_cluster_resources(kind: &str, namespace: Option<&str>) -> ClusterFetc
         || kind.eq_ignore_ascii_case("node")
         || kind.eq_ignore_ascii_case("clusterrole")
         || kind.eq_ignore_ascii_case("clusterrolebinding")
-        || kind.eq_ignore_ascii_case("customresourcedefinition");
+        || kind.eq_ignore_ascii_case("customresourcedefinition")
+        || kind.eq_ignore_ascii_case("persistentvolume")
+        || kind.eq_ignore_ascii_case("storageclass");
     if !is_cluster_scoped {
         if let Some(ns) = namespace.filter(|s| !s.trim().is_empty()) {
             args.push("-n".to_string());

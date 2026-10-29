@@ -659,6 +659,96 @@ fn test_cluster_import_modal_imports_labels_selector_and_manifests_like_ktui() {
 }
 
 #[test]
+fn test_cluster_import_namespace_dropdown_persists_across_sessions() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+    app.open_resource("Deployment", None);
+
+    // Initial default namespace must be "default"
+    assert_eq!(app.cluster_import_namespace, "default");
+
+    // 1. Open Cluster Import modal for labels
+    app.update(Msg::OpenClusterImport("metadata.labels".to_string()));
+    assert!(app.modals.is_open(MODAL_CLUSTER_IMPORT));
+    let screen = render_frame(&mut ratcn, &mut app, 130, 44);
+
+    // Verify Namespace dropdown block is rendered with "default" selected
+    assert!(
+        screen.contains("Namespace (▾)") && screen.contains("default"),
+        "ClusterImportModal must render Namespace dropdown titled 'Namespace (▾)' with 'default':\n{screen}"
+    );
+
+    // In 'default' namespace, mock deployments web-frontend and payments-api are shown, not prod-api
+    assert!(
+        screen.contains("default/web-frontend")
+            && screen.contains("default/payments-api")
+            && !screen.contains("production/prod-api"),
+        "Resources in 'default' must be displayed:\n{screen}"
+    );
+
+    // 2. Change namespace to "production"
+    app.update(Msg::ClusterImportNamespaceSelected(
+        "production".to_string(),
+    ));
+    assert_eq!(app.cluster_import_namespace, "production");
+    assert!(!app.cluster_import_modal.namespace_open);
+
+    let prod_screen = render_frame(&mut ratcn, &mut app, 130, 44);
+    assert!(
+        prod_screen.contains("production/prod-api")
+            && !prod_screen.contains("default/web-frontend"),
+        "Resources in 'production' must be displayed after namespace change:\n{prod_screen}"
+    );
+
+    // 3. Close the modal
+    app.update(Msg::CloseModal);
+    assert!(!app.modals.is_open(MODAL_CLUSTER_IMPORT));
+
+    // The chosen namespace must remain "production"
+    assert_eq!(app.cluster_import_namespace, "production");
+
+    // 4. Reopen Cluster Import modal for full manifest import
+    app.update(Msg::OpenClusterImportManifest);
+    assert!(app.modals.is_open(MODAL_CLUSTER_IMPORT));
+
+    // Reopened modal must remember "production" as the default namespace
+    assert_eq!(app.cluster_import_namespace, "production");
+    let reopen_screen = render_frame(&mut ratcn, &mut app, 130, 44);
+    assert!(
+        reopen_screen.contains("production") && reopen_screen.contains("production/prod-api"),
+        "Reopened Cluster Import modal must retain 'production' as default namespace until app closes:\n{reopen_screen}"
+    );
+
+    // 5. Commit import from the persisted namespace
+    let tabs_before = app.tabs.len();
+    app.update(Msg::ClusterImportCommitSelected);
+    assert!(!app.modals.is_open(MODAL_CLUSTER_IMPORT));
+    assert_eq!(app.tabs.len(), tabs_before + 1);
+    assert_eq!(app.tabs.last().unwrap().label, "Deployment: prod-api");
+
+    let yaml = app.active_yaml().unwrap();
+    assert!(
+        yaml.contains("name: prod-api") && yaml.contains("namespace: production"),
+        "Imported resource must come from the chosen 'production' namespace:\n{yaml}"
+    );
+
+    // 6. Test Esc dismisses open namespace dropdown panel without closing the modal
+    app.update(Msg::OpenClusterImportManifest);
+    assert!(app.modals.is_open(MODAL_CLUSTER_IMPORT));
+    app.update(Msg::ClusterImportNamespaceOpen(true));
+    assert!(app.cluster_import_modal.namespace_open);
+
+    // Esc closes dropdown first
+    send_key(&mut ratcn, &mut app, KeyCode::Esc);
+    assert!(!app.cluster_import_modal.namespace_open);
+    assert!(app.modals.is_open(MODAL_CLUSTER_IMPORT));
+
+    // Next Esc closes the modal
+    send_key(&mut ratcn, &mut app, KeyCode::Esc);
+    assert!(!app.modals.is_open(MODAL_CLUSTER_IMPORT));
+}
+
+#[test]
 fn test_collapsible_categories_hide_and_restore_nested_rows() {
     let mut ratcn = ui::new_runtime();
     let mut app = App::new_test();

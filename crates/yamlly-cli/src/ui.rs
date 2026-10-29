@@ -24,8 +24,8 @@ use ratcn::runtime::{
     PaintCtx, Ratcn, ScopeOptions, TabWrap,
 };
 use ratcn::{
-    BorderStyle, Button, ButtonSize, Checkbox, Dialog, Input, List, ListItem, ScrollArea, Tab,
-    Tabs, TabsActivation, TabsSize, ToastPosition, ToasterWidget,
+    BorderStyle, Button, ButtonSize, Checkbox, Dialog, Input, List, ListItem, ScrollArea, Select,
+    Tab, Tabs, TabsActivation, TabsSize, ToastPosition, ToasterWidget,
 };
 use yamlly_core::field::{FieldKind, Row};
 
@@ -87,7 +87,13 @@ pub fn handle_event(ratcn: &mut Ratcn<App, Msg>, app: &mut App, event: Event) ->
     }
     if let Event::Key(key) = &event {
         if !key.modifiers.any() {
-            if app.modals.top().map(|m| m.as_str()) == Some(MODAL_CLUSTER_IMPORT) {
+            if app.modals.top().map(|m| m.as_str()) == Some(MODAL_CLUSTER_IMPORT)
+                && !app.cluster_import_modal.namespace_open
+                && !app.focus.contains_path([
+                    ChildId::Static(MODAL_CLUSTER_IMPORT),
+                    ChildId::Static("namespace-select"),
+                ])
+            {
                 match key.code {
                     KeyCode::Up => {
                         app.cluster_import_modal.select_next(false);
@@ -156,9 +162,14 @@ pub fn handle_event(ratcn: &mut Ratcn<App, Msg>, app: &mut App, event: Event) ->
                 return true;
             }
             if app.modals.top().map(|m| m.as_str()) == Some(MODAL_CLUSTER_IMPORT)
+                && !app.cluster_import_modal.namespace_open
                 && !app.focus.contains_path([
                     ChildId::Static(MODAL_CLUSTER_IMPORT),
                     ChildId::Static("cancel"),
+                ])
+                && !app.focus.contains_path([
+                    ChildId::Static(MODAL_CLUSTER_IMPORT),
+                    ChildId::Static("namespace-select"),
                 ])
             {
                 app.update(Msg::ClusterImportCommitSelected);
@@ -2623,6 +2634,21 @@ fn declare_cluster_import_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
         })
         .collect();
 
+    let mut ns_options = ctx.state().cluster_namespaces.clone();
+    if !ns_options.iter().any(|ns| ns == "default") {
+        ns_options.insert(0, "default".to_string());
+    }
+    let cur_ns = &ctx.state().cluster_import_namespace;
+    if !ns_options.iter().any(|ns| ns == cur_ns) {
+        ns_options.push(cur_ns.clone());
+    }
+    let mut seen_ns = std::collections::HashSet::new();
+    ns_options.retain(|ns| seen_ns.insert(ns.clone()));
+    let ns_items: Vec<ListItem<String>> = ns_options
+        .into_iter()
+        .map(|ns| ListItem::new(ns.clone(), ns))
+        .collect();
+
     let outer_w = (ctx.area().width.saturating_sub(4)).clamp(90, 118);
     let dialog = Dialog::new()
         .title(dialog_title)
@@ -2634,13 +2660,54 @@ fn declare_cluster_import_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                 return;
             }
             let tabs_rect = Rect::new(body.x, body.y, body.width, 3);
-            let filter_rect = Rect::new(body.x, body.y.saturating_add(3), body.width, 3);
+            let ns_w = 28.min(body.width.saturating_sub(24));
+            let ns_rect = Rect::new(body.x, body.y.saturating_add(3), ns_w, 3);
+            let filter_rect = Rect::new(
+                body.x.saturating_add(ns_w).saturating_add(1),
+                body.y.saturating_add(3),
+                body.width.saturating_sub(ns_w.saturating_add(1)),
+                3,
+            );
             let status_rect = Rect::new(body.x, body.y.saturating_add(6), body.width, 1);
             let list_rect = Rect::new(
                 body.x,
                 body.y.saturating_add(7),
                 body.width,
                 body.height.saturating_sub(7),
+            );
+
+            ctx.paint(move |pctx| {
+                let block = Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Namespace (▾) ")
+                    .border_style(Style::default().fg(pctx.theme.border));
+                pctx.widget(block, ns_rect);
+            });
+
+            let ns_inner = Rect::new(
+                ns_rect.x.saturating_add(1),
+                ns_rect.y.saturating_add(1),
+                ns_rect.width.saturating_sub(2),
+                1,
+            );
+
+            ctx.component(
+                "namespace-select",
+                Select::new(ns_items)
+                    .placeholder("default")
+                    .open(
+                        |app: &App| app.cluster_import_modal.namespace_open,
+                        Msg::ClusterImportNamespaceOpen,
+                    )
+                    .selection(
+                        |app: &App| Some(app.cluster_import_namespace.clone()),
+                        Msg::ClusterImportNamespaceSelected,
+                    )
+                    .item_focus(
+                        |app: &App| app.cluster_import_modal.namespace_cursor.clone(),
+                        Msg::ClusterImportNamespaceCursorChanged,
+                    ),
+                ns_inner,
             );
 
             ctx.component(
