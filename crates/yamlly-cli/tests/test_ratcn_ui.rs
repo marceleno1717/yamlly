@@ -1585,3 +1585,49 @@ fn test_preview_modal_diff_disabled_when_disconnected() {
         );
     }
 }
+
+#[test]
+fn test_cluster_connection_error_toast_is_clean_and_actionable() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+
+    // Simulate an async connection check result carrying noisy Go client-go klog output
+    let noisy_err = r#"
+E1029 13:56:43.557834 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"https://127.0.0.1:32771/api?timeout=2s\": dial tcp 127.0.0.1:32771: connect: connection refused"
+The connection to the server 127.0.0.1:32771 was refused - did you specify the right host or port?
+"#;
+    let clean_err = yamlly::k8s::clean_kubectl_error(noisy_err);
+    app.cluster_status.is_checking = true;
+
+    // Send cleaned failure status through the internal channel
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.cluster_rx = Some(rx);
+    let _ = tx.send(yamlly::k8s::ClusterStatus {
+        is_checking: false,
+        connected: false,
+        context_name: Some("minikube".to_string()),
+        namespace: "default".to_string(),
+        namespaces: vec!["default".to_string()],
+        error: Some(clean_err),
+    });
+
+    app.poll_background();
+
+    // Verify toast is concise, actionable, and free of memcache.go/E1029 traces
+    let toast = app.active_toast().expect("toast must be active");
+    assert!(
+        toast.contains("Cluster connection failed: Connection to server 127.0.0.1:32771 refused"),
+        "toast must provide clear server and port info: {toast}"
+    );
+    assert!(
+        !toast.contains("memcache.go") && !toast.contains("Unhandled Error"),
+        "toast must not contain noisy Go klog internals: {toast}"
+    );
+
+    // Verify UI frame renders toast cleanly without crashing or distortion
+    let screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(
+        screen.contains("Cluster connection failed:") && screen.contains("127.0.0.1:32771 refused"),
+        "screen must render clean error toast:\n{screen}"
+    );
+}

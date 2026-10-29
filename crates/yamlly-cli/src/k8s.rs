@@ -155,7 +155,7 @@ pub fn interpret_kubectl_output(
                     exit_code.unwrap_or(-1)
                 )
             } else {
-                stderr
+                clean_kubectl_error(&stderr)
             },
         },
     }
@@ -259,6 +259,153 @@ pub struct ClusterFetchResult {
     pub error: Option<String>,
 }
 
+/// Cleans raw `kubectl` stderr and error output by stripping internal Go client-go / klog
+/// stack traces (`memcache.go`, `E1029 ...`, etc.) and transforming low-level network errors
+/// into clear, actionable, human-friendly messages for toasts and dialog banners.
+pub fn clean_kubectl_error(raw: &str) -> String {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return String::new();
+    }
+
+    // 1. Connection refused / cannot reach cluster
+    if raw.contains("connection refused") || raw.contains("was refused") {
+        if let Some(endpoint) = extract_server_endpoint(raw) {
+            return format!(
+                "Connection to server {endpoint} refused — check if cluster is running"
+            );
+        }
+        return "Connection to cluster server refused — check if cluster is running".to_string();
+    }
+
+    // 2. Request / connection timeout
+    if raw.contains("Client.Timeout exceeded")
+        || raw.contains("i/o timeout")
+        || raw.contains("request-timeout")
+        || raw.contains("context deadline exceeded")
+    {
+        return "Cluster connection timed out — cluster is unreachable or not responding"
+            .to_string();
+    }
+
+    // 3. DNS / hostname resolution failure
+    if raw.contains("no such host") || raw.contains("server was not found") {
+        if let Some(endpoint) = extract_server_endpoint(raw) {
+            return format!(
+                "Cannot resolve cluster host '{endpoint}' — check kubeconfig server URL"
+            );
+        }
+        return "Cannot resolve cluster host — check kubeconfig server URL".to_string();
+    }
+
+    // 4. TLS Certificate errors
+    if raw.contains("certificate signed by unknown authority") {
+        return "TLS certificate error: certificate signed by unknown authority (check kubeconfig certs)".to_string();
+    }
+    if raw.contains("tls: bad certificate") || raw.contains("x509:") {
+        return "TLS certificate validation failed — check cluster certificates in kubeconfig"
+            .to_string();
+    }
+
+    // 5. Authentication errors (401)
+    if raw.contains("Unauthorized") || raw.contains("You must be logged in to the server") {
+        return "Authentication failed (401 Unauthorized) — credentials or session token expired"
+            .to_string();
+    }
+
+    // 6. Missing context
+    if raw == "No current context" || raw.contains("current-context is not set") {
+        return "No active Kubernetes context found — select a context or configure ~/.kube/config"
+            .to_string();
+    }
+
+    // 7. Binary not found
+    if (raw.contains("No such file or directory") && raw.contains("kubectl"))
+        || raw.contains("kubectl: not found")
+        || raw.contains("executable file not found")
+    {
+        return "kubectl executable not found in PATH — please install kubectl".to_string();
+    }
+
+    // 8. General multi-line cleaning: filter out klog lines and client-go internal noise
+    let clean_lines: Vec<&str> = raw
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !is_klog_line(line))
+        .collect();
+
+    if clean_lines.is_empty() {
+        return "Kubectl command failed (check cluster connection and kubeconfig)".to_string();
+    }
+
+    let mut formatted_lines = Vec::new();
+    for line in clean_lines {
+        let mut cleaned = line;
+        if let Some(rest) = cleaned.strip_prefix("error: ") {
+            cleaned = rest.trim();
+        } else if let Some(rest) = cleaned.strip_prefix("Error from server: ") {
+            cleaned = rest.trim();
+        } else if let Some(rest) = cleaned.strip_prefix("Error: ") {
+            cleaned = rest.trim();
+        }
+        formatted_lines.push(cleaned);
+    }
+
+    formatted_lines.join("\n")
+}
+
+fn is_klog_line(line: &str) -> bool {
+    let bytes = line.as_bytes();
+    if bytes.len() >= 6
+        && matches!(bytes[0], b'E' | b'W' | b'I' | b'F')
+        && bytes[1..5].iter().all(|b| b.is_ascii_digit())
+        && bytes[5] == b' '
+    {
+        return true;
+    }
+    line.contains("memcache.go")
+        || line.contains("request.go")
+        || line.contains("round_trippers.go")
+        || (line.contains("memcache") && line.contains(".go"))
+}
+
+fn extract_server_endpoint(text: &str) -> Option<String> {
+    if let Some(idx) = text.find("The connection to the server ") {
+        let rest = &text[idx + "The connection to the server ".len()..];
+        if let Some(end) = rest.find(" was refused").or_else(|| rest.find(' ')) {
+            let ep = rest[..end].trim();
+            if !ep.is_empty() {
+                return Some(ep.to_string());
+            }
+        }
+    }
+    if let Some(idx) = text.find("dial tcp ") {
+        let rest = &text[idx + "dial tcp ".len()..];
+        if let Some(end) = rest.find(": connect:") {
+            let ep = rest[..end].trim();
+            if !ep.is_empty() {
+                return Some(ep.to_string());
+            }
+        }
+        if let Some(end) = rest.find(':') {
+            let ep = rest[..end].trim();
+            if !ep.is_empty() {
+                return Some(ep.to_string());
+            }
+        }
+    }
+    if let Some(idx) = text.find("lookup ") {
+        let rest = &text[idx + "lookup ".len()..];
+        if let Some(end) = rest.find(" on ") {
+            let ep = rest[..end].trim();
+            if !ep.is_empty() {
+                return Some(ep.to_string());
+            }
+        }
+    }
+    None
+}
+
 pub fn check_connection() -> ClusterStatus {
     // 1. Get current context
     let ctx_output = Command::new("kubectl")
@@ -280,7 +427,7 @@ pub fn check_connection() -> ClusterStatus {
             context_name: None,
             namespace: "default".to_string(),
             namespaces: vec!["default".to_string()],
-            error: Some("No current context".to_string()),
+            error: Some("No active Kubernetes context found in ~/.kube/config".to_string()),
         };
     }
 
@@ -323,7 +470,8 @@ pub fn check_connection() -> ClusterStatus {
             }
         }
         Ok(out) => {
-            let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+            let raw_err = String::from_utf8_lossy(&out.stderr);
+            let err = clean_kubectl_error(&raw_err);
             ClusterStatus {
                 is_checking: false,
                 connected: false,
@@ -339,7 +487,7 @@ pub fn check_connection() -> ClusterStatus {
             context_name,
             namespace,
             namespaces: vec!["default".to_string()],
-            error: Some(e.to_string()),
+            error: Some(clean_kubectl_error(&e.to_string())),
         },
     }
 }
@@ -435,16 +583,16 @@ pub fn get_cluster_resources(kind: &str, namespace: Option<&str>) -> ClusterFetc
                 kind: kind.to_string(),
                 items: Vec::new(),
                 error: Some(if stderr.is_empty() {
-                    "kubectl command failed".to_string()
+                    "kubectl get command failed".to_string()
                 } else {
-                    stderr
+                    clean_kubectl_error(&stderr)
                 }),
             }
         }
         Err(e) => ClusterFetchResult {
             kind: kind.to_string(),
             items: Vec::new(),
-            error: Some(format!("Failed to run kubectl: {e}")),
+            error: Some(clean_kubectl_error(&format!("Failed to run kubectl: {e}"))),
         },
     }
 }
@@ -574,14 +722,17 @@ pub fn use_context(context_name: &str) -> Result<(), String> {
     {
         Ok(out) if out.status.success() => Ok(()),
         Ok(out) => {
-            let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let err = clean_kubectl_error(&stderr);
             Err(if err.is_empty() {
                 format!("Failed to switch to context {context_name}")
             } else {
                 err
             })
         }
-        Err(e) => Err(format!("Failed to execute kubectl: {e}")),
+        Err(e) => Err(clean_kubectl_error(&format!(
+            "Failed to execute kubectl: {e}"
+        ))),
     }
 }
 
@@ -896,6 +1047,69 @@ mod tests {
             resolve_manifest_namespace(ns_yaml, Some("default")),
             None,
             "cluster-scoped resource must not pass -n"
+        );
+    }
+
+    #[test]
+    fn test_clean_kubectl_error_sanitizes_klog_and_provides_actionable_messages() {
+        // 1. Connection refused with noisy client-go memcache logs (user's exact incident)
+        let raw_incident = r#"
+E1029 13:56:43.557834 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"https://127.0.0.1:32771/api?timeout=2s\": dial tcp 127.0.0.1:32771: connect: connection refused"
+E1029 13:56:43.558948 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"https://127.0.0.1:32771/api?timeout=2s\": dial tcp 127.0.0.1:32771: connect: connection refused"
+The connection to the server 127.0.0.1:32771 was refused - did you specify the right host or port?
+"#;
+        assert_eq!(
+            clean_kubectl_error(raw_incident),
+            "Connection to server 127.0.0.1:32771 refused — check if cluster is running"
+        );
+
+        // 2. Timeout
+        let raw_timeout =
+            "Unable to connect to the server: net/http: request canceled (Client.Timeout exceeded)";
+        assert_eq!(
+            clean_kubectl_error(raw_timeout),
+            "Cluster connection timed out — cluster is unreachable or not responding"
+        );
+
+        // 3. DNS resolution failure
+        let raw_dns = "dial tcp: lookup non-existent.cluster.local on 127.0.0.53:53: no such host";
+        assert_eq!(
+            clean_kubectl_error(raw_dns),
+            "Cannot resolve cluster host 'non-existent.cluster.local' — check kubeconfig server URL"
+        );
+
+        // 4. TLS cert verification failure
+        let raw_tls =
+            "Unable to connect to the server: x509: certificate signed by unknown authority";
+        assert_eq!(
+            clean_kubectl_error(raw_tls),
+            "TLS certificate error: certificate signed by unknown authority (check kubeconfig certs)"
+        );
+
+        // 5. Unauthorized (401)
+        let raw_auth = "error: You must be logged in to the server (Unauthorized)";
+        assert_eq!(
+            clean_kubectl_error(raw_auth),
+            "Authentication failed (401 Unauthorized) — credentials or session token expired"
+        );
+
+        // 6. Namespace mismatch (strips redundant error: prefix)
+        let raw_ns_err = "error: the namespace from the provided object \"ivolve\" does not match the namespace \"default\". You must pass '--namespace=ivolve' to perform this operation.";
+        assert_eq!(
+            clean_kubectl_error(raw_ns_err),
+            "the namespace from the provided object \"ivolve\" does not match the namespace \"default\". You must pass '--namespace=ivolve' to perform this operation."
+        );
+
+        // 7. No current context
+        assert_eq!(
+            clean_kubectl_error("No current context"),
+            "No active Kubernetes context found — select a context or configure ~/.kube/config"
+        );
+
+        // 8. Missing kubectl binary
+        assert_eq!(
+            clean_kubectl_error("No such file or directory: 'kubectl'"),
+            "kubectl executable not found in PATH — please install kubectl"
         );
     }
 }

@@ -57,10 +57,12 @@ pub fn render(ratcn: &mut Ratcn<App, Msg>, frame: &mut Frame, app: &App) {
     });
 
     // Render transient corner toasts above all layers
+    let toast_w = (area.width.saturating_sub(4)).clamp(36, 56);
     frame.render_widget(
         ToasterWidget::new(&app.toasts, app.clock)
             .themed(&theme)
             .position(ToastPosition::BottomRight)
+            .toast_width(toast_w)
             .max_visible_toasts(3),
         area,
     );
