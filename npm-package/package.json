@@ -1,6 +1,6 @@
 {
   "name": "yamlly-cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "yamlly (ymly) — An interactive terminal UI (TUI) for building and editing Kubernetes YAML manifests",
   "license": "PolyForm-Noncommercial-1.0.0",
   "repository": {
@@ -31,9 +31,9 @@
     "postinstall": "node scripts/postinstall.js"
   },
   "optionalDependencies": {
-    "@yamlly-cli/linux-x64-bin": "1.0.0",
-    "@yamlly-cli/darwin-arm64-bin": "1.0.0",
-    "@yamlly-cli/win32-x64-bin": "1.0.0"
+    "@yamlly-cli/linux-x64-bin": "1.1.0",
+    "@yamlly-cli/darwin-arm64-bin": "1.1.0",
+    "@yamlly-cli/win32-x64-bin": "1.1.0"
   },
   "publishConfig": {
     "access": "public"
