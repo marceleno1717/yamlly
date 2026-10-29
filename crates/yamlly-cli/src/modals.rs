@@ -32,6 +32,8 @@ pub enum ConfirmKind {
     Quit,
     /// Close a specific tab that has unsaved changes.
     CloseTab(String),
+    /// Apply manifest to live Kubernetes cluster.
+    ApplyManifest,
 }
 
 /// State for the confirmation [`ratcn::Dialog`].
@@ -630,6 +632,7 @@ pub struct PreviewModalState {
     pub path_input: InputState,
     pub scroll: u16,
     pub is_running_op: Option<KubectlOpKind>,
+    pub last_op: Option<KubectlOpKind>,
     pub last_status: Option<(bool, String)>,
     pub view_mode: PreviewViewMode,
     pub diff_output: Option<String>,
@@ -646,6 +649,7 @@ impl Default for PreviewModalState {
             path_input: InputState::new(default_path),
             scroll: 0,
             is_running_op: None,
+            last_op: None,
             last_status: None,
             view_mode: PreviewViewMode::Yaml,
             diff_output: None,
@@ -683,6 +687,7 @@ impl PreviewModalState {
             path_input: InputState::new(display_path),
             scroll: 0,
             is_running_op: None,
+            last_op: None,
             last_status: None,
             view_mode: PreviewViewMode::Yaml,
             diff_output: None,

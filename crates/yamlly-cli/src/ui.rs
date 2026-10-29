@@ -32,9 +32,10 @@ use yamlly_core::field::{FieldKind, Row};
 use crate::app::{App, Msg};
 use crate::k8s::extract_map_from_cluster_item;
 use crate::modals::{
-    ClusterImportModalState, FIELD_PICKER_GROUP_PREFIX, FieldPickerRow, MODAL_CLUSTER_IMPORT,
-    MODAL_CONFIRM, MODAL_CONTEXT_SWITCHER, MODAL_DIR_PICKER, MODAL_FIELD_PICKER, MODAL_MAP_EDITOR,
-    MODAL_PREVIEW, MODAL_SELECT_PICKER, PreviewViewMode, SELECT_UNSET_VALUE,
+    ClusterImportModalState, ConfirmKind, FIELD_PICKER_GROUP_PREFIX, FieldPickerRow,
+    MODAL_CLUSTER_IMPORT, MODAL_CONFIRM, MODAL_CONTEXT_SWITCHER, MODAL_DIR_PICKER,
+    MODAL_FIELD_PICKER, MODAL_MAP_EDITOR, MODAL_PREVIEW, MODAL_SELECT_PICKER, PreviewViewMode,
+    SELECT_UNSET_VALUE,
 };
 
 /// Construct the configured `Ratcn` runtime bound to [`App::focus`] and [`App::modals`].
@@ -134,6 +135,10 @@ pub fn handle_event(ratcn: &mut Ratcn<App, Msg>, app: &mut App, event: Event) ->
                         app.update(Msg::PreviewToggleView(Some(
                             crate::modals::PreviewViewMode::Yaml,
                         )));
+                        return true;
+                    }
+                    KeyCode::Char('a' | 'A') => {
+                        app.update(Msg::PreviewApply);
                         return true;
                     }
                     _ => {}
@@ -1715,10 +1720,22 @@ fn declare_footer(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
 
 fn declare_confirm_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
     let cm = ctx.state().confirm_modal.clone();
+    let is_destructive = matches!(cm.kind, ConfirmKind::Quit | ConfirmKind::CloseTab(_));
+    let mut confirm_btn = Button::new(cm.confirm_label)
+        .size(ButtonSize::Large)
+        .on_press(|| Msg::ConfirmAccepted);
+    if is_destructive {
+        confirm_btn = confirm_btn.destructive();
+    }
+    let outer_w = if matches!(cm.kind, ConfirmKind::ApplyManifest) {
+        68
+    } else {
+        60
+    };
     let dialog = Dialog::new()
         .title(cm.title)
         .description(cm.message)
-        .outer_width(60)
+        .outer_width(outer_w)
         .on_dismiss(|| Msg::CloseModal)
         .action(
             "cancel",
@@ -1727,13 +1744,7 @@ fn declare_confirm_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                 .size(ButtonSize::Large)
                 .on_press(|| Msg::CloseModal),
         )
-        .action(
-            "confirm",
-            Button::new(cm.confirm_label)
-                .destructive()
-                .size(ButtonSize::Large)
-                .on_press(|| Msg::ConfirmAccepted),
-        );
+        .action("confirm", confirm_btn);
     ctx.modal(MODAL_CONFIRM, dialog, ctx.area());
 }
 
@@ -1930,6 +1941,7 @@ fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
     let is_connected = ctx.state().cluster_status.connected;
     let is_running = ctx.state().preview_modal.is_running_op.is_some();
     let running_op = ctx.state().preview_modal.is_running_op;
+    let last_op = ctx.state().preview_modal.last_op;
     let last_status = ctx.state().preview_modal.last_status.clone();
     let view_mode = ctx.state().preview_modal.view_mode;
     let is_diff_view = view_mode == PreviewViewMode::Diff;
@@ -1941,7 +1953,7 @@ fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
         .clone()
         .unwrap_or_else(|| "cluster".to_string());
 
-    let outer_w = (ctx.area().width.saturating_sub(4)).clamp(92, 120);
+    let outer_w = (ctx.area().width.saturating_sub(4)).clamp(96, 124);
     let dialog = Dialog::new()
         .title("YAML Preview & Save Manifest")
         .outer_width(outer_w)
@@ -1987,22 +1999,45 @@ fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                             Some(crate::k8s::KubectlOpKind::Diff) => {
                                 format!("Computing live cluster diff against {ctx_name}…")
                             }
+                            Some(crate::k8s::KubectlOpKind::Apply) => {
+                                format!("Applying manifest directly to {ctx_name}…")
+                            }
                             _ => format!("Running server dry-run validation against {ctx_name}…"),
                         };
                         ("◌", msg, pctx.theme.warning)
                     } else if let Some((ok, msg)) = &status_val {
                         if *ok {
-                            let text = if is_diff_view {
-                                format!("Cluster diff: {msg}")
-                            } else {
-                                format!("Server dry-run: {msg}")
+                            let text = match last_op {
+                                Some(crate::k8s::KubectlOpKind::Apply) => {
+                                    format!("Applied: {msg}")
+                                }
+                                Some(crate::k8s::KubectlOpKind::Diff) => {
+                                    format!("Cluster diff: {msg}")
+                                }
+                                _ => {
+                                    if is_diff_view {
+                                        format!("Cluster diff: {msg}")
+                                    } else {
+                                        format!("Server dry-run: {msg}")
+                                    }
+                                }
                             };
                             ("✓", text, Color::Rgb(74, 222, 128))
                         } else {
-                            let text = if is_diff_view {
-                                format!("Cluster diff failed: {msg}")
-                            } else {
-                                format!("Server dry-run failed: {msg}")
+                            let text = match last_op {
+                                Some(crate::k8s::KubectlOpKind::Apply) => {
+                                    format!("Cluster apply failed: {msg}")
+                                }
+                                Some(crate::k8s::KubectlOpKind::Diff) => {
+                                    format!("Cluster diff failed: {msg}")
+                                }
+                                _ => {
+                                    if is_diff_view {
+                                        format!("Cluster diff failed: {msg}")
+                                    } else {
+                                        format!("Server dry-run failed: {msg}")
+                                    }
+                                }
                             };
                             ("✕", text, pctx.theme.destructive)
                         }
@@ -2060,7 +2095,7 @@ fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                 ctx.paint(move |pctx| {
                     pctx.with_buffer(hint_rect, |rect, buf| {
                         let hint = Line::from(vec![Span::styled(
-                            "Tab / f / y to switch view",
+                            "Tab / f / y: View  •  a: Apply  •  d: Dry-Run",
                             Style::default().fg(pctx.theme.muted_foreground),
                         )]);
                         Paragraph::new(hint).render(rect, buf);
@@ -2152,6 +2187,14 @@ fn declare_preview_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                 .size(ButtonSize::Large)
                 .disabled(!is_connected || is_running)
                 .on_press(|| Msg::PreviewDiff),
+        )
+        .action(
+            "apply",
+            Button::new("☸ Apply")
+                .outline()
+                .size(ButtonSize::Large)
+                .disabled(!is_connected || is_running)
+                .on_press(|| Msg::PreviewApply),
         )
         .action(
             "save",

@@ -87,6 +87,7 @@ pub enum Msg {
     PreviewSave,
     PreviewDryRun,
     PreviewDiff,
+    PreviewApply,
     PreviewToggleView(Option<PreviewViewMode>),
     OpenDirPicker,
     // Directory Picker modal
@@ -685,6 +686,14 @@ impl App {
                     } else {
                         "Live cluster diff ready".to_string()
                     }
+                } else if res.op == KubectlOpKind::Apply {
+                    res.stdout
+                        .lines()
+                        .next()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or("Applied successfully")
+                        .to_string()
                 } else {
                     res.stdout
                         .lines()
@@ -708,9 +717,14 @@ impl App {
                     .next()
                     .map(str::trim)
                     .filter(|s| !s.is_empty())
-                    .unwrap_or("Server dry-run failed")
+                    .unwrap_or(match res.op {
+                        KubectlOpKind::Apply => "Cluster apply failed",
+                        KubectlOpKind::Diff => "Cluster diff failed",
+                        KubectlOpKind::DryRunServer => "Server dry-run failed",
+                    })
                     .to_string()
             };
+            self.preview_modal.last_op = Some(res.op);
             self.preview_modal.last_status = Some((res.ok, status_msg));
         }
 
@@ -733,7 +747,12 @@ impl App {
                 tab.form.mark_clean();
                 tab.dirty = false;
             }
-            self.notify_kind(summary, ToastKind::Info);
+            let toast_kind = if res.op == KubectlOpKind::Apply {
+                ToastKind::Success
+            } else {
+                ToastKind::Info
+            };
+            self.notify_kind(summary, toast_kind);
         } else {
             let err_line = res
                 .stderr
@@ -818,6 +837,11 @@ impl App {
         self.active_tab_idx
             .and_then(|i| self.tabs.get(i))
             .map(|t| t.kind.clone())
+    }
+
+    pub fn active_tab(&self) -> Option<&TabInfo> {
+        let idx = self.active_tab_idx?;
+        self.tabs.get(idx)
     }
 
     pub fn active_tab_id(&self) -> Option<String> {
@@ -1622,6 +1646,15 @@ impl App {
                             self.close_tab_at(idx);
                         }
                     }
+                    ConfirmKind::ApplyManifest => {
+                        let yaml = self.preview_modal.yaml.clone();
+                        if self.start_kubectl_op(KubectlOpKind::Apply, yaml) {
+                            self.preview_modal.is_running_op = Some(KubectlOpKind::Apply);
+                            self.preview_modal.last_op = Some(KubectlOpKind::Apply);
+                            self.preview_modal.last_status = None;
+                            self.notify_kind("Applying manifest to cluster…", ToastKind::Loading);
+                        }
+                    }
                 }
             }
             Msg::FieldPickerFilterChanged(state) => {
@@ -1734,9 +1767,52 @@ impl App {
                 let yaml = self.preview_modal.yaml.clone();
                 if self.start_kubectl_op(KubectlOpKind::Diff, yaml) {
                     self.preview_modal.is_running_op = Some(KubectlOpKind::Diff);
+                    self.preview_modal.last_op = Some(KubectlOpKind::Diff);
                     self.preview_modal.last_status = None;
                     self.notify_kind("Computing live cluster diff…", ToastKind::Loading);
                 }
+            }
+            Msg::PreviewApply => {
+                if !self.cluster_status.connected {
+                    self.notify_kind(
+                        "Cluster is disconnected — reconnect or switch context first",
+                        ToastKind::Warning,
+                    );
+                    return;
+                }
+                let yaml = &self.preview_modal.yaml;
+                let kind = self
+                    .active_tab()
+                    .map(|t| t.kind.clone())
+                    .unwrap_or_else(|| "Resource".to_string());
+                let name = self
+                    .active_tab()
+                    .and_then(|t| t.form.field_value("metadata.name"))
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.trim().is_empty())
+                    .unwrap_or("unnamed")
+                    .to_string();
+                let context = self
+                    .cluster_status
+                    .context_name
+                    .clone()
+                    .unwrap_or_else(|| "current-context".to_string());
+                let effective_ns =
+                    resolve_manifest_namespace(yaml, Some(&self.cluster_status.namespace))
+                        .unwrap_or_else(|| "cluster-scoped".to_string());
+
+                let message = format!(
+                    "Apply {kind} '{name}' to cluster context '{context}' (namespace: '{effective_ns}')?\n\nThis will configure or update live cluster resources.",
+                );
+
+                self.confirm_modal = ConfirmModalState {
+                    title: "Apply Manifest to Cluster".to_string(),
+                    message,
+                    confirm_label: "☸ Apply to Cluster".to_string(),
+                    kind: ConfirmKind::ApplyManifest,
+                };
+                let _ = self.modals.open(MODAL_CONFIRM, &mut self.focus);
+                self.ui_dirty = true;
             }
             Msg::PreviewToggleView(target) => {
                 let next_mode = target.unwrap_or(match self.preview_modal.view_mode {
@@ -2061,6 +2137,10 @@ impl App {
                             }
                             KeyCode::Char('y' | 'Y') => {
                                 self.update(Msg::PreviewToggleView(Some(PreviewViewMode::Yaml)));
+                                return true;
+                            }
+                            KeyCode::Char('a' | 'A') => {
+                                self.update(Msg::PreviewApply);
                                 return true;
                             }
                             KeyCode::Tab => {

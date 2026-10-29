@@ -1631,3 +1631,116 @@ The connection to the server 127.0.0.1:32771 was refused - did you specify the r
         "screen must render clean error toast:\n{screen}"
     );
 }
+
+#[test]
+fn test_preview_modal_apply_flow_and_confirm_guard() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+    app.open_resource("Deployment", None);
+
+    // Edit form to make tab dirty
+    app.update(Msg::FormInputChanged {
+        row_idx: 1,
+        state: InputState::new("checkout-svc"),
+    });
+    assert!(app.tabs[0].dirty, "editing field must mark tab dirty");
+
+    app.update(Msg::OpenPreview);
+    assert!(app.modals.is_open(MODAL_PREVIEW));
+
+    // 1. Preview modal renders '☸ Apply' action button
+    let screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(
+        screen.contains("☸ Apply"),
+        "preview modal must render '☸ Apply' button:\n{screen}"
+    );
+
+    // 2. Clicking '☸ Apply' opens ConfirmModal stacked on top of Preview modal
+    app.update(Msg::PreviewApply);
+    assert!(
+        app.modals.is_open(MODAL_CONFIRM),
+        "Confirm modal must be open"
+    );
+    assert!(
+        app.modals.is_open(MODAL_PREVIEW),
+        "Preview modal must remain open underneath confirm modal"
+    );
+
+    let confirm_screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(
+        confirm_screen.contains("Apply Manifest to Cluster")
+            && confirm_screen.contains("checkout-svc")
+            && confirm_screen.contains("☸ Apply to Cluster"),
+        "confirm modal must show context/target details and apply button:\n{confirm_screen}"
+    );
+
+    // 3. Cancelling confirm modal dismisses it without applying
+    app.update(Msg::CloseModal);
+    assert!(!app.modals.is_open(MODAL_CONFIRM));
+    assert!(app.modals.is_open(MODAL_PREVIEW));
+    assert!(app.tabs[0].dirty, "cancelling must keep tab dirty");
+    assert!(app.preview_modal.is_running_op.is_none());
+
+    // 4. Confirming apply triggers kubectl op, updates banner and marks tab clean
+    app.update(Msg::PreviewApply);
+    assert!(app.modals.is_open(MODAL_CONFIRM));
+    app.update(Msg::ConfirmAccepted);
+    assert!(!app.modals.is_open(MODAL_CONFIRM));
+    assert!(app.modals.is_open(MODAL_PREVIEW));
+
+    assert!(app.preview_modal.is_running_op.is_some());
+    app.poll_background();
+    assert!(app.preview_modal.is_running_op.is_none());
+
+    assert!(
+        !app.tabs[0].dirty,
+        "successful cluster apply must mark tab clean"
+    );
+
+    let post_apply_screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    assert!(
+        post_apply_screen.contains("Applied:") || post_apply_screen.contains("configured"),
+        "preview banner must show apply success:\n{post_apply_screen}"
+    );
+}
+
+#[test]
+fn test_preview_modal_apply_disabled_when_disconnected() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+    app.open_resource("Deployment", None);
+    app.cluster_status.connected = false;
+    app.update(Msg::OpenPreview);
+    assert!(app.modals.is_open(MODAL_PREVIEW));
+
+    // Dispatching PreviewApply when disconnected does not open Confirm modal
+    app.update(Msg::PreviewApply);
+    assert!(
+        !app.modals.is_open(MODAL_CONFIRM),
+        "confirm modal must not open when cluster is disconnected"
+    );
+    assert!(
+        app.active_toast()
+            .unwrap_or("")
+            .contains("Cluster is disconnected"),
+        "toast must warn of disconnected cluster"
+    );
+
+    // Clicking disabled button via mouse does nothing
+    let screen = render_frame(&mut ratcn, &mut app, 140, 36);
+    if let Some((y, line)) = screen
+        .lines()
+        .enumerate()
+        .find(|(_, l)| l.contains("☸ Apply"))
+    {
+        let x = line
+            .find("☸ Apply")
+            .map(|b| line[..b].chars().count() as u16)
+            .unwrap();
+        send_click(&mut ratcn, &mut app, x, y as u16);
+        assert!(
+            !app.modals.is_open(MODAL_CONFIRM),
+            "clicking disabled apply button must not open confirm modal"
+        );
+    }
+}
