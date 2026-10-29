@@ -1834,3 +1834,123 @@ fn test_preview_modal_apply_disabled_when_disconnected() {
         );
     }
 }
+
+#[test]
+fn test_secret_data_base64_plain_text_toggle_and_save() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+
+    // 1. Open Secret resource form
+    app.open_resource("Secret", None);
+    assert_eq!(app.active_resource_kind().as_deref(), Some("Secret"));
+
+    // 2. Open Map Editor for "data"
+    app.open_map_editor("data");
+    assert!(app.modals.is_open(MODAL_MAP_EDITOR));
+    assert!(app.map_editor_modal.is_secret_data);
+    assert!(!app.map_editor_modal.is_plain_text);
+
+    let screen_b64 = render_frame(&mut ratcn, &mut app, 130, 44);
+    assert!(
+        screen_b64.contains("Edit Map — data [Base64]")
+            && screen_b64.contains("Value #1 (Base64)")
+            && screen_b64.contains("Decode (Plain Text)"),
+        "Secret data map editor must show Base64 mode and decode button:\n{screen_b64}"
+    );
+
+    // 3. Set Base64 key/value entries: password -> c2VjcmV0MTIz (secret123)
+    app.update(Msg::MapEditorKeyChanged {
+        row_idx: 0,
+        state: InputState::new("password"),
+    });
+    app.update(Msg::MapEditorValueChanged {
+        row_idx: 0,
+        state: InputState::new("c2VjcmV0MTIz"),
+    });
+
+    // Add a second entry: username -> YWRtaW4= (admin)
+    app.update(Msg::MapEditorAddRow);
+    app.update(Msg::MapEditorKeyChanged {
+        row_idx: 1,
+        state: InputState::new("username"),
+    });
+    app.update(Msg::MapEditorValueChanged {
+        row_idx: 1,
+        state: InputState::new("YWRtaW4="),
+    });
+
+    // 4. Toggle to Plain Text mode
+    app.update(Msg::MapEditorToggleEncoding);
+    assert!(app.map_editor_modal.is_plain_text);
+
+    // Values should now be decoded to plain text
+    assert_eq!(app.map_editor_modal.rows[0].value.value(), "secret123");
+    assert_eq!(app.map_editor_modal.rows[1].value.value(), "admin");
+
+    let screen_plain = render_frame(&mut ratcn, &mut app, 130, 44);
+    assert!(
+        screen_plain.contains("Edit Map — data [Plain Text]")
+            && screen_plain.contains("Value #1 (Plain Text)")
+            && screen_plain.contains("Encode (Base64)")
+            && screen_plain.contains("secret123")
+            && screen_plain.contains("admin"),
+        "Secret data map editor must show Plain Text mode, encode button, and decoded text:\n{screen_plain}"
+    );
+
+    // 5. Edit in Plain Text mode: change password to "super-secret-999"
+    app.update(Msg::MapEditorValueChanged {
+        row_idx: 0,
+        state: InputState::new("super-secret-999"),
+    });
+
+    // 6. Test toggling back to Base64
+    app.update(Msg::MapEditorToggleEncoding);
+    assert!(!app.map_editor_modal.is_plain_text);
+    // super-secret-999 in base64 is c3VwZXItc2VjcmV0LTk5OQ==
+    assert_eq!(
+        app.map_editor_modal.rows[0].value.value(),
+        "c3VwZXItc2VjcmV0LTk5OQ=="
+    );
+    assert_eq!(app.map_editor_modal.rows[1].value.value(), "YWRtaW4=");
+
+    // Test Ctrl+E shortcut toggles encoding back and forth
+    send_ctrl(&mut ratcn, &mut app, 'e');
+    assert!(app.map_editor_modal.is_plain_text);
+    assert_eq!(
+        app.map_editor_modal.rows[0].value.value(),
+        "super-secret-999"
+    );
+
+    send_ctrl(&mut ratcn, &mut app, 'e');
+    assert!(!app.map_editor_modal.is_plain_text);
+
+    // 7. Toggle back to Plain Text and save while in Plain Text
+    app.update(Msg::MapEditorToggleEncoding);
+    assert!(app.map_editor_modal.is_plain_text);
+    assert_eq!(
+        app.map_editor_modal.rows[0].value.value(),
+        "super-secret-999"
+    );
+
+    app.update(Msg::MapEditorSave);
+    assert!(!app.modals.is_open(MODAL_MAP_EDITOR));
+
+    // Applied YAML must contain valid Base64 encoded values under data:
+    let yaml = app.active_yaml().unwrap();
+    assert!(
+        yaml.contains("password: c3VwZXItc2VjcmV0LTk5OQ==") && yaml.contains("username: YWRtaW4="),
+        "Secret YAML data must have automatically encoded base64 values:\n{yaml}"
+    );
+
+    // 8. Verify ordinary map (metadata.labels) does NOT have the encoding toggle button
+    app.open_map_editor("metadata.labels");
+    assert!(app.modals.is_open(MODAL_MAP_EDITOR));
+    assert!(!app.map_editor_modal.is_secret_data);
+    let screen_labels = render_frame(&mut ratcn, &mut app, 130, 44);
+    assert!(
+        !screen_labels.contains("Decode (Plain Text)")
+            && !screen_labels.contains("Encode (Base64)"),
+        "Ordinary map editor must not show base64 toggle button:\n{screen_labels}"
+    );
+    app.update(Msg::CloseModal);
+}

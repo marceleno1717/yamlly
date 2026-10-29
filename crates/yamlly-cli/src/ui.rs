@@ -86,6 +86,14 @@ pub fn handle_event(ratcn: &mut Ratcn<App, Msg>, app: &mut App, event: Event) ->
         }
     }
     if let Event::Key(key) = &event {
+        if app.modals.top().map(|m| m.as_str()) == Some(MODAL_MAP_EDITOR)
+            && app.map_editor_modal.is_secret_data
+            && key.modifiers.ctrl
+            && matches!(key.code, KeyCode::Char('e' | 'E' | 'b' | 'B'))
+        {
+            app.update(Msg::MapEditorToggleEncoding);
+            return true;
+        }
         if !key.modifiers.any() {
             if app.modals.top().map(|m| m.as_str()) == Some(MODAL_CLUSTER_IMPORT)
                 && !app.cluster_import_modal.namespace_open
@@ -2383,7 +2391,17 @@ fn declare_dir_picker_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
 fn declare_map_editor_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
     let is_connected = ctx.state().cluster_status.connected;
     let me = &ctx.state().map_editor_modal;
-    let title = me.title.clone();
+    let is_secret_data = me.is_secret_data;
+    let is_plain_text = me.is_plain_text;
+    let title = if is_secret_data {
+        if is_plain_text {
+            format!("{} [Plain Text]", me.title)
+        } else {
+            format!("{} [Base64]", me.title)
+        }
+    } else {
+        me.title.clone()
+    };
     let row_ids: Vec<(usize, ChildId)> = me
         .rows
         .iter()
@@ -2393,8 +2411,8 @@ fn declare_map_editor_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
     // Each row is 3 rows tall + 1 row of vertical spacing (stride = 4)
     let content_h = (row_ids.len() as u16).saturating_mul(4).max(4);
 
-    let outer_w = (ctx.area().width.saturating_sub(4)).clamp(92, 120);
-    let dialog = Dialog::new()
+    let outer_w = (ctx.area().width.saturating_sub(4)).clamp(92, 124);
+    let mut dialog = Dialog::new()
         .title(title)
         .outer_width(outer_w)
         .on_dismiss(|| Msg::CloseModal)
@@ -2435,6 +2453,25 @@ fn declare_map_editor_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                                     let del_rect =
                                         Rect::new(r.right().saturating_sub(del_w), r.y, del_w, 3);
 
+                                    let val_title = if is_secret_data {
+                                        if is_plain_text {
+                                            format!(" Value #{} (Plain Text) ", row_idx + 1)
+                                        } else {
+                                            format!(" Value #{} (Base64) ", row_idx + 1)
+                                        }
+                                    } else {
+                                        format!(" Value #{} ", row_idx + 1)
+                                    };
+                                    let val_placeholder = if is_secret_data {
+                                        if is_plain_text {
+                                            "plain text"
+                                        } else {
+                                            "base64 string"
+                                        }
+                                    } else {
+                                        "value"
+                                    };
+
                                     ctx.component(
                                         "key",
                                         Input::new()
@@ -2460,8 +2497,8 @@ fn declare_map_editor_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                                         "val",
                                         Input::new()
                                             .prefix("  ")
-                                            .title(format!(" Value #{} ", row_idx + 1))
-                                            .placeholder("value")
+                                            .title(val_title)
+                                            .placeholder(val_placeholder)
                                             .value(
                                                 move |app: &App| {
                                                     app.map_editor_modal
@@ -2491,35 +2528,50 @@ fn declare_map_editor_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
                     }),
                 body,
             );
-        })
-        .action(
-            "cancel",
-            Button::new("Cancel")
+        });
+
+    dialog = dialog.action(
+        "cancel",
+        Button::new("Cancel")
+            .outline()
+            .size(ButtonSize::Large)
+            .on_press(|| Msg::CloseModal),
+    );
+    dialog = dialog.action(
+        "import",
+        Button::new("↓ Import from Cluster")
+            .outline()
+            .size(ButtonSize::Large)
+            .disabled(!is_connected)
+            .on_press(|| Msg::OpenClusterImportFromMapEditor),
+    );
+    if is_secret_data {
+        let toggle_label = if is_plain_text {
+            "🔒 Encode (Base64)"
+        } else {
+            "🔤 Decode (Plain Text)"
+        };
+        dialog = dialog.action(
+            "toggle_encoding",
+            Button::new(toggle_label)
                 .outline()
                 .size(ButtonSize::Large)
-                .on_press(|| Msg::CloseModal),
-        )
-        .action(
-            "import",
-            Button::new("↓ Import from Cluster")
-                .outline()
-                .size(ButtonSize::Large)
-                .disabled(!is_connected)
-                .on_press(|| Msg::OpenClusterImportFromMapEditor),
-        )
-        .action(
-            "add",
-            Button::new("+ Add Entry")
-                .outline()
-                .size(ButtonSize::Large)
-                .on_press(|| Msg::MapEditorAddRow),
-        )
-        .action(
-            "save",
-            Button::new("Apply Map")
-                .size(ButtonSize::Large)
-                .on_press(|| Msg::MapEditorSave),
+                .on_press(|| Msg::MapEditorToggleEncoding),
         );
+    }
+    dialog = dialog.action(
+        "add",
+        Button::new("+ Add Entry")
+            .outline()
+            .size(ButtonSize::Large)
+            .on_press(|| Msg::MapEditorAddRow),
+    );
+    dialog = dialog.action(
+        "save",
+        Button::new("Apply Map")
+            .size(ButtonSize::Large)
+            .on_press(|| Msg::MapEditorSave),
+    );
 
     ctx.modal(MODAL_MAP_EDITOR, dialog, ctx.area());
 }

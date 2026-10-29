@@ -101,6 +101,7 @@ pub enum Msg {
     MapEditorValueChanged { row_idx: usize, state: InputState },
     MapEditorAddRow,
     MapEditorRemoveRow(usize),
+    MapEditorToggleEncoding,
     MapEditorSave,
     // Select Picker (Dropdown List) modal
     SelectPickerCursorChanged(String, usize),
@@ -1215,7 +1216,13 @@ impl App {
         };
         let entries = form.get_map_entries(path);
         let title = format!("Edit Map — {path}");
-        self.map_editor_modal = MapEditorModalState::open_for(path, title, entries);
+        let is_secret_data = (self
+            .active_resource_kind()
+            .map(|k| k.eq_ignore_ascii_case("secret"))
+            .unwrap_or(false)
+            && (path == "data" || path.ends_with(".data")))
+            || (path == "data" && self.active_resource_kind().is_none());
+        self.map_editor_modal = MapEditorModalState::open_for(path, title, entries, is_secret_data);
         let _ = self.modals.open(MODAL_MAP_EDITOR, &mut self.focus);
         self.ui_dirty = true;
     }
@@ -1939,9 +1946,20 @@ impl App {
             Msg::MapEditorRemoveRow(idx) => {
                 self.map_editor_modal.remove_row(idx);
             }
+            Msg::MapEditorToggleEncoding => {
+                match self.map_editor_modal.toggle_encoding() {
+                    Ok(msg) => {
+                        self.notify_kind(msg, ToastKind::Success);
+                    }
+                    Err(warn) => {
+                        self.notify_kind(warn, ToastKind::Warning);
+                    }
+                }
+                self.ui_dirty = true;
+            }
             Msg::MapEditorSave => {
                 let path = self.map_editor_modal.path.clone();
-                let entries = self.map_editor_modal.collect_entries();
+                let entries = self.map_editor_modal.collect_entries_for_save();
                 let _ = self.modals.close(&mut self.focus);
                 if let Some(form) = self.active_form_mut() {
                     form.set_map(&path, entries);

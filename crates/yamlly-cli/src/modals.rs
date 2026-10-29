@@ -11,6 +11,7 @@ use ratcn::InputState;
 use ratcn::runtime::ChildId;
 use yamlly_core::{LeafFieldPath, is_field_required};
 
+use crate::b64::{base64_decode_utf8, base64_encode};
 use crate::k8s::KubectlOpKind;
 
 pub const MODAL_CONFIRM: &str = "confirm";
@@ -856,16 +857,28 @@ pub struct MapEditorModalState {
     pub rows: Vec<MapEntryRow>,
     pub scroll: u16,
     pub next_seq: usize,
+    /// True when editing the `data` field of a Kubernetes `Secret`.
+    pub is_secret_data: bool,
+    /// When `is_secret_data` is true, indicates whether the user is viewing/editing in plain text (decoded)
+    /// or in base64.
+    pub is_plain_text: bool,
 }
 
 impl MapEditorModalState {
-    pub fn open_for(path: &str, title: String, entries: Vec<(String, String)>) -> Self {
+    pub fn open_for(
+        path: &str,
+        title: String,
+        entries: Vec<(String, String)>,
+        is_secret_data: bool,
+    ) -> Self {
         let mut me = Self {
             path: path.to_string(),
             title,
             rows: Vec::new(),
             scroll: 0,
             next_seq: 0,
+            is_secret_data,
+            is_plain_text: false,
         };
         if entries.is_empty() {
             me.add_row(String::new(), String::new());
@@ -907,6 +920,63 @@ impl MapEditorModalState {
             .collect()
     }
 
+    /// Collect entries for applying back into the resource document.
+    /// If currently in plain text mode for a Secret `data` field, values are automatically
+    /// encoded to standard Base64 so the resulting manifest is always valid Kubernetes YAML.
+    pub fn collect_entries_for_save(&self) -> Vec<(String, String)> {
+        let raw = self.collect_entries();
+        if self.is_secret_data && self.is_plain_text {
+            raw.into_iter()
+                .map(|(k, v)| {
+                    let encoded = base64_encode(v.as_bytes());
+                    (k, encoded)
+                })
+                .collect()
+        } else {
+            raw
+        }
+    }
+
+    /// Toggle between decoding to plain text and encoding to base64 for Secret `data`.
+    pub fn toggle_encoding(&mut self) -> Result<String, String> {
+        if self.is_plain_text {
+            // Plain text -> Base64
+            for row in &mut self.rows {
+                let plain = row.value.value().to_string();
+                if !plain.is_empty() {
+                    let enc = base64_encode(plain.as_bytes());
+                    row.value = InputState::new(enc);
+                }
+            }
+            self.is_plain_text = false;
+            Ok("Encoded values to Base64".to_string())
+        } else {
+            // Base64 -> Plain text
+            let mut errors = 0;
+            for row in &mut self.rows {
+                let b64 = row.value.value().trim().to_string();
+                if !b64.is_empty() {
+                    match base64_decode_utf8(&b64) {
+                        Ok(plain) => {
+                            row.value = InputState::new(plain);
+                        }
+                        Err(_) => {
+                            errors += 1;
+                        }
+                    }
+                }
+            }
+            self.is_plain_text = true;
+            if errors > 0 {
+                Err(format!(
+                    "Switched to Plain Text ({errors} non-Base64 or binary value(s) kept raw)"
+                ))
+            } else {
+                Ok("Decoded values to Plain Text".to_string())
+            }
+        }
+    }
+
     /// Merge imported `(key, value)` pairs into the current map editor rows.
     pub fn merge_entries(&mut self, imported: Vec<(String, String)>) {
         // Remove the default empty placeholder row if it is the only row and still blank
@@ -917,10 +987,15 @@ impl MapEditorModalState {
             self.rows.clear();
         }
         for (k, v) in imported {
-            if let Some(existing) = self.rows.iter_mut().find(|r| r.key.value().trim() == k) {
-                existing.value = InputState::new(v);
+            let actual_val = if self.is_secret_data && self.is_plain_text {
+                base64_decode_utf8(v.trim()).unwrap_or(v)
             } else {
-                self.add_row(k, v);
+                v
+            };
+            if let Some(existing) = self.rows.iter_mut().find(|r| r.key.value().trim() == k) {
+                existing.value = InputState::new(actual_val);
+            } else {
+                self.add_row(k, actual_val);
             }
         }
         if self.rows.is_empty() {
