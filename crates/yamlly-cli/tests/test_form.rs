@@ -928,3 +928,63 @@ fn test_reconnect_and_refresh_loads_all_namespaces_and_updates_tabs() {
         "new tab must get newly discovered namespace"
     );
 }
+
+#[test]
+fn test_port_and_env_not_required_in_validation() {
+    let mut form = FormState::new("Deployment", None, vec!["default".to_string()]);
+
+    // Fill in container name so it is not empty
+    focus(&mut form, "spec.template.spec.containers[0].name");
+    form.begin_edit();
+    form.buffer = "my-nginx".to_string();
+    form.commit();
+
+    // Verify containerPort and env are not required
+    let cport_req = form
+        .rows
+        .iter()
+        .find_map(|r| match &r.kind {
+            Row::Field { field, .. }
+                if field.path == "spec.template.spec.containers[0].ports[0].containerPort" =>
+            {
+                Some(field.required)
+            }
+            _ => None,
+        })
+        .expect("containerPort field");
+    assert!(!cport_req, "containerPort must not be required");
+
+    let cenv_req = form
+        .rows
+        .iter()
+        .find_map(|r| match &r.kind {
+            Row::Field { field, .. }
+                if field.path == "spec.template.spec.containers[0].env[0].name" =>
+            {
+                Some(field.required)
+            }
+            _ => None,
+        })
+        .expect("env name field");
+    assert!(!cenv_req, "env name must not be required");
+
+    // Validation must pass without complaining about empty port or empty env
+    let err_count = form.validate();
+    let errors = form.collect_errors();
+    assert_eq!(
+        err_count, 0,
+        "empty port number and env must not produce validation errors: {errors:?}"
+    );
+
+    // Also test Service port
+    let svc_form = FormState::new("Service", None, vec!["default".to_string()]);
+    let svc_port_req = svc_form
+        .rows
+        .iter()
+        .find_map(|r| match &r.kind {
+            Row::Field { field, .. } if field.path == "spec.ports[0].port" => Some(field.required),
+            _ => None,
+        })
+        .expect("service port field");
+    assert!(!svc_port_req, "service port must not be required");
+}

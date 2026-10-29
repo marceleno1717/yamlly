@@ -220,12 +220,18 @@ fn test_required_marker_follows_schema() {
         })
     };
 
-    // The generated schema marks container name/port required...
+    // Container name remains required...
     let cname = field("spec.template.spec.containers[0].name").expect("containers[0].name");
     assert!(cname.required, "container name is required");
+
+    // ...but port numbers and env variables are not required in Kubernetes manifests:
     let cport = field("spec.template.spec.containers[0].ports[0].containerPort")
         .expect("containers[0].ports[0].containerPort");
-    assert!(cport.required, "containerPort is required");
+    assert!(!cport.required, "containerPort must not be required");
+
+    let cenv =
+        field("spec.template.spec.containers[0].env[0].name").expect("containers[0].env[0].name");
+    assert!(!cenv.required, "env name must not be required");
 
     // ...but top-level metadata.name is not flagged in the shard, and we must
     // mirror the schema rather than hardcode Kubernetes conventions.

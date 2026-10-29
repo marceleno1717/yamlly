@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use ratcn::InputState;
 use ratcn::runtime::ChildId;
-use yamlly_core::LeafFieldPath;
+use yamlly_core::{LeafFieldPath, is_field_required};
 
 use crate::k8s::KubectlOpKind;
 
@@ -322,7 +322,7 @@ impl FieldPickerModalState {
                 path: leaf.path.clone(),
                 label: clean_label,
                 field_type: leaf.field_type.clone(),
-                required: leaf.required,
+                required: is_field_required(&leaf.path, leaf.required),
                 depth: 0,
                 selected: self.selected.contains(&leaf.path),
             });
@@ -359,7 +359,7 @@ impl FieldPickerModalState {
                         path: leaf.path.clone(),
                         label: clean_label,
                         field_type: leaf.field_type.clone(),
-                        required: leaf.required,
+                        required: is_field_required(&leaf.path, leaf.required),
                         depth: depth + 1,
                         selected: selected.contains(&leaf.path),
                     });

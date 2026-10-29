@@ -1213,9 +1213,12 @@ impl FormState {
             // 2. Integer field holding something that is not a number.
             if matches!(field.kind, FieldKind::Integer) {
                 let bad = match value {
-                    None => false,
+                    None | Some(Value::Null) => false,
                     Some(Value::Number(_)) => false,
-                    Some(Value::String(s)) => s.parse::<i64>().is_err(),
+                    Some(Value::String(s)) => {
+                        let t = s.trim();
+                        !t.is_empty() && t.parse::<i64>().is_err()
+                    }
                     Some(_) => true,
                 };
                 if bad {

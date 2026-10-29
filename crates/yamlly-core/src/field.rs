@@ -312,6 +312,31 @@ fn clean_key(key: &str) -> String {
     key.replace("[]", "").replace("-ARR", "")
 }
 
+/// Decide whether a field is required in forms and validation.
+///
+/// Port numbers (`containerPort`, `port`, `targetPort`, `hostPort`, etc.) and environment
+/// variable definitions (`env`, `envFrom`) are not required in Kubernetes manifests even if
+/// the underlying OpenAPI schema marks child fields as required when their parent
+/// object is present.
+pub fn is_field_required(path: &str, schema_required: bool) -> bool {
+    if !schema_required {
+        return false;
+    }
+    let lookup = schema_lookup_path(path);
+    for seg in lookup.split('.') {
+        if seg == "containerPort"
+            || seg == "port"
+            || seg == "targetPort"
+            || seg == "hostPort"
+            || seg == "env"
+            || seg == "envFrom"
+        {
+            return false;
+        }
+    }
+    true
+}
+
 /// Flatten the path tree into renderable [`Row`]s.
 ///
 /// `array_counts` lets the caller materialise N items per array (the original
@@ -345,10 +370,11 @@ fn render_tree(node: &PathTree, ctx: &mut RenderCtx, out: &mut Vec<Row>) {
                 .and_then(|n| n.get("type"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("string");
-            let required = node_ref
+            let raw_req = node_ref
                 .and_then(|n| n.get("required"))
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
+            let required = is_field_required(&path, raw_req);
             out.push(Row::Field {
                 field: FormField {
                     label: clean_key(path.rsplit('.').next().unwrap_or(&path)),
