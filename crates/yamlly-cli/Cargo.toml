@@ -39,6 +39,8 @@ pkg-url = "{ repo }/releases/download/v{ version }/yamlly-win32-x64.exe"
 [dependencies]
 yamlly-core.workspace = true
 serde_json = { version = "1.0", features = ["preserve_order"] }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
 ratcn = { version = "0.0.6", features = ["crossterm"] }
 ratatui = { version = "0.30.2", default-features = false, features = ["layout-cache", "std", "crossterm"] }
 crossterm = "0.29"

@@ -15,6 +15,8 @@ pub struct ResourceIndexEntry {
     pub resource: Option<String>,
     #[serde(default)]
     pub common_fields: Vec<String>,
+    #[serde(default)]
+    pub basic_fields: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -154,6 +156,27 @@ pub fn get_common_fields(kind: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+pub fn get_express_fields_ref(kind: &str) -> Option<&'static [String]> {
+    INDEX_ENTRIES
+        .iter()
+        .position(|e| e.kind.eq_ignore_ascii_case(kind))
+        .map(|i| INDEX_ENTRIES[i].basic_fields.as_slice())
+}
+
+pub fn get_express_fields(kind: &str) -> Vec<String> {
+    get_express_fields_ref(kind)
+        .map(<[String]>::to_vec)
+        .unwrap_or_default()
+}
+
+pub fn get_basic_fields_ref(kind: &str) -> Option<&'static [String]> {
+    get_express_fields_ref(kind)
+}
+
+pub fn get_basic_fields(kind: &str) -> Vec<String> {
+    get_express_fields(kind)
+}
+
 pub fn group_common_fields_by_section(common_paths: &[String]) -> IndexMap<String, Vec<String>> {
     let mut sections: IndexMap<String, Vec<String>> = IndexMap::new();
     for path in common_paths {
@@ -208,6 +231,25 @@ pub fn common_fields_cached(kind: &str) -> Option<&'static [String]> {
     let leaked: &'static [String] = Box::leak(entry.to_vec().into_boxed_slice());
     let mut g = CACHE.write().ok()?;
     Some(*g.entry(key).or_insert(leaked))
+}
+
+pub fn express_fields_cached(kind: &str) -> Option<&'static [String]> {
+    static CACHE: LazyLock<std::sync::RwLock<HashMap<String, &'static [String]>>> =
+        LazyLock::new(|| std::sync::RwLock::new(HashMap::new()));
+    let key = kind.to_ascii_lowercase();
+    if let Ok(g) = CACHE.read() {
+        if let Some(hit) = g.get(&key) {
+            return Some(hit);
+        }
+    }
+    let entry = get_express_fields_ref(&key)?;
+    let leaked: &'static [String] = Box::leak(entry.to_vec().into_boxed_slice());
+    let mut g = CACHE.write().ok()?;
+    Some(*g.entry(key).or_insert(leaked))
+}
+
+pub fn basic_fields_cached(kind: &str) -> Option<&'static [String]> {
+    express_fields_cached(kind)
 }
 
 /// Cached variant for a loaded shard. The schema is immutable once parsed, so

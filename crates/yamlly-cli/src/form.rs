@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 use ratcn::InputState;
 use serde_json::{Map, Value, json};
-use yamlly_core::field::{FieldKind, FormField, Row, build_form};
+use yamlly_core::field::{FieldKind, FormField, Row};
 use yamlly_core::{get_nested, normalize, set_nested};
 
 /// One row as it will be drawn, with the state needed to render it.
@@ -64,6 +64,7 @@ pub struct FormState {
     /// Extra schema paths merged in beyond the kind's common fields (the
     /// field picker's selections).
     extra_paths: Vec<String>,
+    pub express_mode: bool,
     scroll: usize,
 }
 
@@ -123,6 +124,7 @@ impl FormState {
             empty_input: InputState::default(),
             collapsed_categories: HashSet::new(),
             extra_paths,
+            express_mode: false,
             scroll: 0,
         };
         // Baseline comes from the merged data, so an opened file that already
@@ -145,11 +147,12 @@ impl FormState {
                 self.extra_paths.push(p.clone());
             }
         }
-        let (rows, shown) = build_form(
+        let (rows, shown) = yamlly_core::build_form_with_mode(
             &self.kind,
             &self.namespaces,
             &self.extra_paths,
             &self.array_counts,
+            self.express_mode,
         )
         .unwrap_or_default();
         self.shown_paths = shown;
@@ -335,6 +338,22 @@ impl FormState {
     /// Borrow the `ratcn::InputState` for `path`, falling back to `empty_input`.
     pub fn input_state(&self, path: &str) -> &InputState {
         self.inputs.get(path).unwrap_or(&self.empty_input)
+    }
+
+    /// Refresh the display text and input buffer for all rows presenting `target_path`.
+    pub fn refresh_path(&mut self, target_path: &str) {
+        let indices: Vec<usize> = self
+            .rows
+            .iter()
+            .enumerate()
+            .filter_map(|(i, r)| match &r.kind {
+                Row::Field { field, .. } if field.path == target_path => Some(i),
+                _ => None,
+            })
+            .collect();
+        for idx in indices {
+            self.refresh_row(idx);
+        }
     }
 
     /// Handle a change emitted by a `ratcn::Input` at `row_idx`.

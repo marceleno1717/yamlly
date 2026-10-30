@@ -22,6 +22,7 @@ pub const MODAL_MAP_EDITOR: &str = "map_editor";
 pub const MODAL_SELECT_PICKER: &str = "select_picker";
 pub const MODAL_CLUSTER_IMPORT: &str = "cluster_import";
 pub const MODAL_CONTEXT_SWITCHER: &str = "context_switcher";
+pub const MODAL_QUICK_ADD: &str = "quick_add";
 
 /// Special dropdown option value that clears an Enum / Namespace field.
 pub const SELECT_UNSET_VALUE: &str = "__unset__";
@@ -1286,5 +1287,63 @@ impl ContextSwitcherModalState {
             (cur_idx + list.len() - 1) % list.len()
         };
         self.cursor = Some(list[next_idx].clone());
+    }
+}
+
+/// State for the Quick Add preset mounting modal dialog.
+#[derive(Debug, Clone, Default)]
+pub struct QuickAddModalState {
+    pub cursor: Option<String>,
+    pub selected: Option<String>,
+    pub selected_idx: usize,
+    pub presets: Vec<(&'static yamlly_core::QuickAddPreset, Vec<String>)>,
+}
+
+impl QuickAddModalState {
+    pub fn new_for_kind(kind: &str) -> Self {
+        let presets = yamlly_core::get_applicable_presets(kind);
+        let first_id = presets.first().map(|(p, _)| p.id.to_string());
+        Self {
+            cursor: first_id.clone(),
+            selected: first_id,
+            selected_idx: 0,
+            presets,
+        }
+    }
+
+    pub fn set_selected_id(&mut self, id: &str) {
+        if let Some(pos) = self.presets.iter().position(|(p, _)| p.id == id) {
+            self.selected_idx = pos;
+            self.cursor = Some(id.to_string());
+            self.selected = Some(id.to_string());
+        }
+    }
+
+    pub fn select_next(&mut self, forward: bool) {
+        if self.presets.is_empty() {
+            return;
+        }
+        if forward {
+            self.selected_idx = (self.selected_idx + 1) % self.presets.len();
+        } else if self.selected_idx > 0 {
+            self.selected_idx -= 1;
+        } else {
+            self.selected_idx = self.presets.len() - 1;
+        }
+        if let Some((p, _)) = self.presets.get(self.selected_idx) {
+            let id = p.id.to_string();
+            self.cursor = Some(id.clone());
+            self.selected = Some(id);
+        }
+    }
+
+    pub fn selected_paths(&self) -> Option<&[String]> {
+        self.presets
+            .get(self.selected_idx)
+            .map(|(_, paths)| paths.as_slice())
+    }
+
+    pub fn selected_preset_title(&self) -> Option<&'static str> {
+        self.presets.get(self.selected_idx).map(|(p, _)| p.title)
     }
 }

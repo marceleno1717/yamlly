@@ -547,6 +547,7 @@ fn test_enum_and_namespace_render_as_dropdown_list_and_open_on_enter() {
 fn test_cluster_import_modal_imports_labels_selector_and_manifests_like_ktui() {
     let mut ratcn = ui::new_runtime();
     let mut app = App::new_test();
+    app.user_config.mode = yamlly::config::EditMode::Advanced;
     app.open_resource("Deployment", None);
     let screen = render_frame(&mut ratcn, &mut app, 130, 44);
 
@@ -752,6 +753,7 @@ fn test_cluster_import_namespace_dropdown_persists_across_sessions() {
 fn test_collapsible_categories_hide_and_restore_nested_rows() {
     let mut ratcn = ui::new_runtime();
     let mut app = App::new_test();
+    app.user_config.mode = yamlly::config::EditMode::Advanced;
     app.open_resource("Deployment", None);
     let screen = render_frame(&mut ratcn, &mut app, 130, 44);
 
@@ -1146,6 +1148,7 @@ fn test_bigger_text_fields_and_modal_widths() {
 fn test_category_divider_hierarchy_and_input_indentation() {
     let mut ratcn = ui::new_runtime();
     let mut app = App::new_test();
+    app.user_config.mode = yamlly::config::EditMode::Advanced;
     app.open_resource("Deployment", None);
     let screen = render_frame(&mut ratcn, &mut app, 130, 80);
 
@@ -1953,4 +1956,112 @@ fn test_secret_data_base64_plain_text_toggle_and_save() {
         "Ordinary map editor must not show base64 toggle button:\n{screen_labels}"
     );
     app.update(Msg::CloseModal);
+}
+
+#[test]
+fn test_overflow_tabs_fixed_right_arrow_and_counter_position() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+
+    // Open multiple resources with variable length names to cause tab overflow
+    let kinds = [
+        "Pod",
+        "Deployment",
+        "Service",
+        "ConfigMap",
+        "Secret",
+        "Ingress",
+        "Job",
+        "DaemonSet",
+    ];
+    for k in kinds {
+        app.open_resource(k, None);
+    }
+    assert_eq!(app.tabs.len(), 8);
+
+    let width = 120u16;
+    let height = 36u16;
+
+    // Helper to find the column index of '▶' on the tab strip line
+    let find_arrow_col = |screen: &str| -> Option<usize> {
+        for line in screen.lines() {
+            if line.contains("Express") && line.contains('▶') {
+                return line.find('▶');
+            }
+        }
+        None
+    };
+
+    // Cycle through various tabs of different label lengths:
+    // Tab 0 ("Pod" - short)
+    app.update(Msg::TabSelected(app.tabs[0].id.clone()));
+    let screen_tab0 = render_frame(&mut ratcn, &mut app, width, height);
+    let col_tab0 = find_arrow_col(&screen_tab0).expect("arrow ▶ must be found on tab 0");
+
+    // Tab 1 ("Deployment" - medium)
+    app.update(Msg::TabSelected(app.tabs[1].id.clone()));
+    let screen_tab1 = render_frame(&mut ratcn, &mut app, width, height);
+    let col_tab1 = find_arrow_col(&screen_tab1).expect("arrow ▶ must be found on tab 1");
+
+    // Tab 3 ("ConfigMap" - medium)
+    app.update(Msg::TabSelected(app.tabs[3].id.clone()));
+    let screen_tab3 = render_frame(&mut ratcn, &mut app, width, height);
+    let col_tab3 = find_arrow_col(&screen_tab3).expect("arrow ▶ must be found on tab 3");
+
+    // Tab 7 ("DaemonSet" - long)
+    app.update(Msg::TabSelected(app.tabs[7].id.clone()));
+    let screen_tab7 = render_frame(&mut ratcn, &mut app, width, height);
+    let col_tab7 = find_arrow_col(&screen_tab7).expect("arrow ▶ must be found on tab 7");
+
+    // The right arrow ▶ MUST stay at the exact same column regardless of active tab label width
+    assert_eq!(
+        col_tab0, col_tab1,
+        "arrow position must be fixed between Tab 0 and Tab 1"
+    );
+    assert_eq!(
+        col_tab1, col_tab3,
+        "arrow position must be fixed between Tab 1 and Tab 3"
+    );
+    assert_eq!(
+        col_tab3, col_tab7,
+        "arrow position must be fixed between Tab 3 and Tab 7"
+    );
+}
+
+#[test]
+fn test_express_advanced_buttons_render_with_borders_and_suffixes() {
+    let mut ratcn = ui::new_runtime();
+    let mut app = App::new_test();
+
+    // 1. Verify in empty workspace screen
+    let screen_empty = render_frame(&mut ratcn, &mut app, 120, 36);
+    assert!(
+        screen_empty.contains("Express ⚡"),
+        "Empty workspace must render 'Express ⚡':\n{screen_empty}"
+    );
+    assert!(
+        screen_empty.contains("Advanced ⚙"),
+        "Empty workspace must render 'Advanced ⚙':\n{screen_empty}"
+    );
+
+    // 2. Open a tab and verify buttons render in active workspace with borders
+    app.open_resource("Deployment", None);
+    let screen_active = render_frame(&mut ratcn, &mut app, 120, 36);
+    assert!(
+        screen_active.contains("Express ⚡"),
+        "Active workspace must render 'Express ⚡':\n{screen_active}"
+    );
+    assert!(
+        screen_active.contains("Advanced ⚙"),
+        "Active workspace must render 'Advanced ⚙':\n{screen_active}"
+    );
+
+    // 3. Click Advanced button or send SetMode(Advanced)
+    app.update(Msg::SetMode(yamlly::config::EditMode::Advanced));
+    assert_eq!(app.user_config.mode, yamlly::config::EditMode::Advanced);
+    let screen_advanced = render_frame(&mut ratcn, &mut app, 120, 36);
+    assert!(
+        screen_advanced.contains("Advanced ⚙"),
+        "Active workspace must render 'Advanced ⚙' after switch:\n{screen_advanced}"
+    );
 }

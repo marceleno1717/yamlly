@@ -1,5 +1,6 @@
 pub mod app;
 pub mod b64;
+pub mod config;
 pub mod form;
 pub mod k8s;
 pub mod modals;

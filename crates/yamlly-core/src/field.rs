@@ -453,13 +453,26 @@ pub fn build_form(
     extra_paths: &[String],
     array_counts: &HashMap<String, usize>,
 ) -> Option<(Vec<Row>, Vec<String>)> {
+    build_form_with_mode(kind, namespaces, extra_paths, array_counts, false)
+}
+
+/// Build the form for `kind`, either with full `common_fields` (`express_mode = false`)
+/// or minimal `express_fields` (`express_mode = true`).
+pub fn build_form_with_mode(
+    kind: &str,
+    namespaces: &[String],
+    extra_paths: &[String],
+    array_counts: &HashMap<String, usize>,
+    express_mode: bool,
+) -> Option<(Vec<Row>, Vec<String>)> {
     let resource = crate::loader::load_resource_ref(kind)?;
     let schema_fields = resource.get("fields")?;
 
-    // Cached; cloning ~14 short strings per rebuild is the bulk of the
-    // form-build cost otherwise. Order is preserved from index.json so the
-    // rendered layout matches the original app field-for-field.
-    let cached = crate::loader::common_fields_cached(kind).unwrap_or_default();
+    let cached = if express_mode {
+        crate::loader::express_fields_cached(kind).unwrap_or_default()
+    } else {
+        crate::loader::common_fields_cached(kind).unwrap_or_default()
+    };
     let mut common: Vec<String> = cached.to_vec();
     // Extra paths (from the field picker or an opened file) extend the default
     // set without duplicates or singleton category conflicts.

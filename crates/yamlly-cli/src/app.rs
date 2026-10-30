@@ -31,6 +31,8 @@ pub struct TabInfo {
     pub dirty: bool,
     /// Optional path to the file this tab was loaded from or last saved to.
     pub source_path: Option<String>,
+    /// Auto-linking tracker for linked fields (e.g. metadata.name -> labels: app: <name>).
+    pub link_tracker: yamlly_core::LinkTracker,
     /// The resource form being edited in this tab.
     pub form: FormState,
 }
@@ -40,6 +42,8 @@ pub struct TabInfo {
 pub enum Msg {
     FocusChanged(FocusState),
     CycleTheme,
+    ToggleMode,
+    SetMode(crate::config::EditMode),
     Reconnect,
     // Sidebar resource list & filter
     ResourceFilterChanged(InputState),
@@ -54,6 +58,10 @@ pub enum Msg {
     ValidateForm,
     OpenPreview,
     OpenFieldPicker,
+    OpenQuickAdd,
+    QuickAddCursorChanged(String, usize),
+    QuickAddSelect(String),
+    QuickAddCommit,
     OpenMapEditor(String),
     OpenSelectPicker(String),
     OpenClusterImport(String),
@@ -151,6 +159,7 @@ pub struct App {
     pub last_kubectl_op: Option<KubectlOpResult>,
     pub mock_cluster_resources: Option<HashMap<String, Vec<serde_json::Value>>>,
     pub is_ssh: bool,
+    pub user_config: crate::config::UserConfig,
     pub tabs: Vec<TabInfo>,
     pub active_tab_idx: Option<usize>,
     pub tab_seq: usize,
@@ -164,6 +173,7 @@ pub struct App {
     pub select_picker_modal: SelectPickerModalState,
     pub cluster_import_modal: ClusterImportModalState,
     pub context_switcher_modal: ContextSwitcherModalState,
+    pub quick_add_modal: crate::modals::QuickAddModalState,
     // Fallback empty input state for borrowing when no tab/row exists
     pub empty_input: InputState,
     /// Last rendered footer geometry `(x, y, width)` for bottom-bar mouse hit-testing.
@@ -174,6 +184,7 @@ pub struct App {
 impl App {
     pub fn new(initial_file: Option<String>) -> Self {
         let themes = Theme::presets().to_vec();
+        let user_config = crate::config::UserConfig::load_or_init();
         let no_color = std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty());
         let theme_idx = if no_color {
             themes
@@ -181,8 +192,12 @@ impl App {
                 .position(|t| t.name == "Terminal")
                 .unwrap_or(0)
         } else {
-            0
+            themes
+                .iter()
+                .position(|t| t.name == user_config.theme)
+                .unwrap_or(0)
         };
+        let is_ssh = user_config.is_ssh_active();
         let resources = yamlly_core::get_all_resources().to_vec();
         let focused_resource_kind = resources.first().map(|r| r.kind.clone());
 
@@ -215,8 +230,8 @@ impl App {
             kubectl_op_rx: None,
             last_kubectl_op: None,
             mock_cluster_resources: None,
-            is_ssh: std::env::var_os("SSH_CONNECTION").is_some()
-                || std::env::var_os("SSH_CLIENT").is_some(),
+            is_ssh,
+            user_config,
             tabs: Vec::new(),
             active_tab_idx: None,
             tab_seq: 0,
@@ -229,6 +244,7 @@ impl App {
             select_picker_modal: SelectPickerModalState::default(),
             cluster_import_modal: ClusterImportModalState::default(),
             context_switcher_modal: ContextSwitcherModalState::default(),
+            quick_add_modal: crate::modals::QuickAddModalState::default(),
             empty_input: InputState::default(),
             footer_rect: std::cell::Cell::new((0, u16::MAX, 0)),
             ui_dirty: true,
@@ -501,6 +517,7 @@ impl App {
             last_kubectl_op: None,
             mock_cluster_resources: Some(mock),
             is_ssh: false,
+            user_config: crate::config::UserConfig::default(),
             tabs: Vec::new(),
             active_tab_idx: None,
             tab_seq: 0,
@@ -513,6 +530,7 @@ impl App {
             select_picker_modal: SelectPickerModalState::default(),
             cluster_import_modal: ClusterImportModalState::default(),
             context_switcher_modal: ContextSwitcherModalState::default(),
+            quick_add_modal: crate::modals::QuickAddModalState::default(),
             empty_input: InputState::default(),
             footer_rect: std::cell::Cell::new((0, u16::MAX, 0)),
             ui_dirty: true,
@@ -534,7 +552,29 @@ impl App {
     pub fn cycle_theme(&mut self) {
         self.theme_idx = (self.theme_idx + 1) % self.themes.len();
         let name = self.themes[self.theme_idx].name;
+        self.user_config.theme = name.to_string();
+        let _ = self.user_config.save_to_disk();
         self.notify_kind(format!("Theme: {name}"), ToastKind::Info);
+    }
+
+    pub fn toggle_mode(&mut self) {
+        self.set_mode(self.user_config.mode.toggle());
+    }
+
+    pub fn set_mode(&mut self, mode: crate::config::EditMode) {
+        self.user_config.mode = mode;
+        let is_express = self.user_config.mode == crate::config::EditMode::Express;
+        if let Some(tab) = self.active_tab_mut() {
+            tab.form.express_mode = is_express;
+            tab.form.rebuild();
+        }
+        let _ = self.user_config.save_to_disk();
+        let label = match self.user_config.mode {
+            crate::config::EditMode::Express => "Express Mode (fast authoring)",
+            crate::config::EditMode::Advanced => "Advanced Mode (all standard fields)",
+        };
+        self.notify_kind(format!("Switched to {label}"), ToastKind::Info);
+        self.ui_dirty = true;
     }
 
     pub fn notify(&mut self, msg: impl Into<String>) {
@@ -878,6 +918,11 @@ impl App {
         self.tabs.get(idx)
     }
 
+    pub fn active_tab_mut(&mut self) -> Option<&mut TabInfo> {
+        let idx = self.active_tab_idx?;
+        self.tabs.get_mut(idx)
+    }
+
     pub fn active_tab_id(&self) -> Option<String> {
         self.active_tab_idx
             .and_then(|i| self.tabs.get(i))
@@ -969,6 +1014,8 @@ impl App {
         }
 
         let mut form = FormState::new(kind, initial_data, dedup_ns);
+        form.express_mode = self.user_config.mode == crate::config::EditMode::Express;
+        form.rebuild();
         // Put initial form focus on the first editable field row.
         if let Some(first_field_idx) = form
             .rows
@@ -992,6 +1039,14 @@ impl App {
             .position(|r| matches!(r.kind, Row::Field { .. }))
             .map(|idx| format!("field-{idx}"));
 
+        let mut link_tracker = yamlly_core::LinkTracker::new();
+        if initial_data.is_some() {
+            // Seeded from existing document: decouple all links to preserve file contents
+            for rule in yamlly_core::get_link_rules_for_kind(kind) {
+                link_tracker.unlink(rule.target);
+            }
+        }
+
         let tab = TabInfo {
             id: format!("editor-tab-{}", self.tab_seq),
             label,
@@ -999,6 +1054,7 @@ impl App {
             kind: kind.to_string(),
             dirty: false,
             source_path: None,
+            link_tracker,
             form,
         };
 
@@ -1186,6 +1242,46 @@ impl App {
             FieldPickerModalState::open_for(&tab.form.kind, &tab.form.shown_paths);
         let _ = self.modals.open(MODAL_FIELD_PICKER, &mut self.focus);
         self.ui_dirty = true;
+    }
+
+    pub fn open_quick_add(&mut self) {
+        let Some(idx) = self.active_tab_idx else {
+            self.notify_kind("Open a resource first", ToastKind::Warning);
+            return;
+        };
+        let Some(tab) = self.tabs.get(idx) else {
+            return;
+        };
+        self.quick_add_modal = crate::modals::QuickAddModalState::new_for_kind(&tab.form.kind);
+        if self.quick_add_modal.presets.is_empty() {
+            self.notify_kind(
+                format!("No quick add presets available for {}", tab.form.kind),
+                ToastKind::Info,
+            );
+            return;
+        }
+        let _ = self
+            .modals
+            .open(crate::modals::MODAL_QUICK_ADD, &mut self.focus);
+        self.ui_dirty = true;
+    }
+
+    pub fn commit_quick_add(&mut self) {
+        let Some(paths) = self.quick_add_modal.selected_paths().map(|s| s.to_vec()) else {
+            self.close_modal();
+            return;
+        };
+        let title = self
+            .quick_add_modal
+            .selected_preset_title()
+            .unwrap_or("Preset");
+
+        if let Some(tab) = self.active_tab_mut() {
+            tab.form.rebuild_with_extra(&paths);
+            self.refresh_tab_state();
+            self.notify_kind(format!("Mounted preset: {title}"), ToastKind::Success);
+        }
+        self.close_modal();
     }
 
     pub fn open_preview(&mut self) {
@@ -1481,6 +1577,8 @@ impl App {
                 self.focus = focus;
             }
             Msg::CycleTheme => self.cycle_theme(),
+            Msg::ToggleMode => self.toggle_mode(),
+            Msg::SetMode(mode) => self.set_mode(mode),
             Msg::Reconnect => self.reconnect(),
             Msg::ResourceFilterChanged(state) => {
                 self.resource_filter = state;
@@ -1541,6 +1639,20 @@ impl App {
             }
             Msg::OpenFieldPicker => {
                 self.open_field_picker();
+            }
+            Msg::OpenQuickAdd => {
+                self.open_quick_add();
+            }
+            Msg::QuickAddCursorChanged(id, _scroll) => {
+                self.quick_add_modal.set_selected_id(&id);
+                self.ui_dirty = true;
+            }
+            Msg::QuickAddSelect(id) => {
+                self.quick_add_modal.set_selected_id(&id);
+                self.commit_quick_add();
+            }
+            Msg::QuickAddCommit => {
+                self.commit_quick_add();
             }
             Msg::OpenMapEditor(path) => {
                 self.open_map_editor(&path);
@@ -1672,8 +1784,35 @@ impl App {
                 }
             }
             Msg::FormInputChanged { row_idx, state } => {
-                if let Some(form) = self.active_form_mut() {
-                    form.set_input_state(row_idx, state);
+                let mut auto_updated = Vec::new();
+                if let Some(tab_idx) = self.active_tab_idx
+                    && let Some(tab) = self.tabs.get_mut(tab_idx)
+                {
+                    let kind = tab.kind.clone();
+                    let edited_path = tab.form.rows.get(row_idx).and_then(|r| match &r.kind {
+                        Row::Field { field, .. } => Some(field.path.clone()),
+                        _ => None,
+                    });
+
+                    let new_val = state.value().to_string();
+                    tab.form.set_input_state(row_idx, state);
+
+                    if let Some(path) = edited_path {
+                        if path == "metadata.name" {
+                            auto_updated = tab.link_tracker.propagate_links(
+                                &kind,
+                                &path,
+                                &new_val,
+                                &mut tab.form.data,
+                            );
+                        } else {
+                            // Manual edit on another field decouples it from auto-propagation
+                            tab.link_tracker.unlink(&path);
+                        }
+                    }
+                    for target_path in &auto_updated {
+                        tab.form.refresh_path(target_path);
+                    }
                 }
                 self.refresh_tab_state();
             }
@@ -2124,6 +2263,10 @@ impl App {
                     self.update(Msg::RemoveFocusedField);
                     return true;
                 }
+                KeyCode::Char('a' | 'A') => {
+                    self.update(Msg::OpenQuickAdd);
+                    return true;
+                }
                 _ => {}
             }
         }
@@ -2193,6 +2336,28 @@ impl App {
                             }
                             KeyCode::Down => {
                                 self.cluster_import_modal.select_next(true);
+                                self.ui_dirty = true;
+                                return true;
+                            }
+                            _ => return false,
+                        }
+                    }
+                    return false;
+                }
+                crate::modals::MODAL_QUICK_ADD => {
+                    if !key.modifiers.any() {
+                        match key.code {
+                            KeyCode::Enter => {
+                                self.update(Msg::QuickAddCommit);
+                                return true;
+                            }
+                            KeyCode::Up => {
+                                self.quick_add_modal.select_next(false);
+                                self.ui_dirty = true;
+                                return true;
+                            }
+                            KeyCode::Down => {
+                                self.quick_add_modal.select_next(true);
                                 self.ui_dirty = true;
                                 return true;
                             }
@@ -2332,6 +2497,10 @@ impl App {
                 }
                 KeyCode::Char('t') => {
                     self.update(Msg::CycleTheme);
+                    return true;
+                }
+                KeyCode::Char('m') => {
+                    self.update(Msg::ToggleMode);
                     return true;
                 }
                 KeyCode::Char('i') => {

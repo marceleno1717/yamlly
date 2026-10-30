@@ -24,8 +24,9 @@ use ratcn::runtime::{
     PaintCtx, Ratcn, ScopeOptions, TabWrap,
 };
 use ratcn::{
-    BorderStyle, Button, ButtonSize, Checkbox, Dialog, Input, List, ListItem, ScrollArea, Select,
-    Tab, Tabs, TabsActivation, TabsSize, ToastPosition, ToasterWidget,
+    BorderStyle, Button, ButtonSize, ButtonStyle, ButtonVariant, Checkbox, Dialog, Input, List,
+    ListItem, ScrollArea, Select, Tab, Tabs, TabsActivation, TabsSize, ToastPosition,
+    ToasterWidget,
 };
 use yamlly_core::field::{FieldKind, Row};
 
@@ -280,6 +281,7 @@ fn declare_app(ctx: &mut DeclareCtx<'_, App, Msg>) {
             MODAL_SELECT_PICKER => declare_select_picker_modal(ctx),
             MODAL_CLUSTER_IMPORT => declare_cluster_import_modal(ctx),
             MODAL_CONTEXT_SWITCHER => declare_context_switcher_modal(ctx),
+            crate::modals::MODAL_QUICK_ADD => declare_quick_add_modal(ctx),
             _ => {}
         }
     }
@@ -371,8 +373,13 @@ fn declare_header(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
             ));
         }
 
+        let studio_title = if area.width >= 125 {
+            "  K8s Manifest Studio  "
+        } else {
+            " "
+        };
         spans.extend([
-            Span::styled("  K8s Manifest Studio  ", Style::default().fg(muted)),
+            Span::styled(studio_title, Style::default().fg(muted)),
             Span::styled("│  ", Style::default().fg(pctx.theme.border)),
             Span::styled(
                 format!("{status_dot} "),
@@ -691,6 +698,95 @@ fn declare_workspace(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
 }
 
 fn declare_empty_workspace(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
+    let use_large_chrome = area.height >= 16;
+    let btn_size = if use_large_chrome {
+        ButtonSize::Large
+    } else {
+        ButtonSize::default()
+    };
+    let express_btn_w: u16 = 13;
+    let advanced_btn_w: u16 = 14;
+    let mode_btn_w: u16 = express_btn_w
+        .saturating_add(1)
+        .saturating_add(advanced_btn_w); // 28
+    if area.width >= mode_btn_w.saturating_add(6) {
+        let is_express = ctx.state().user_config.mode == crate::config::EditMode::Express;
+        let start_x = area.right().saturating_sub(mode_btn_w).saturating_sub(2);
+        let tab_h: u16 = if use_large_chrome { 3 } else { 1 };
+        let express_rect = Rect::new(start_x, area.y.saturating_add(1), express_btn_w, tab_h);
+        let advanced_rect = Rect::new(
+            start_x.saturating_add(express_btn_w).saturating_add(1),
+            area.y.saturating_add(1),
+            advanced_btn_w,
+            tab_h,
+        );
+
+        ctx.paint(move |pctx| {
+            let active_rect = if is_express {
+                express_rect
+            } else {
+                advanced_rect
+            };
+            let bg = if pctx.state().is_ssh {
+                pctx.theme.surface
+            } else {
+                pctx.theme.secondary
+            };
+            pctx.with_buffer(active_rect, |rect, buf| {
+                buf.set_style(rect, Style::default().bg(bg));
+            });
+        });
+
+        let btn_express = if is_express {
+            Button::new("Express ⚡")
+                .outline()
+                .size(btn_size)
+                .style(|theme| {
+                    let mut s = ButtonStyle::from_theme(theme, ButtonVariant::Outline);
+                    s.border = Some(theme.primary);
+                    s.foreground = theme.primary;
+                    s
+                })
+                .on_press(|| Msg::SetMode(crate::config::EditMode::Express))
+        } else {
+            Button::new("Express ⚡")
+                .outline()
+                .size(btn_size)
+                .style(|theme| {
+                    let mut s = ButtonStyle::from_theme(theme, ButtonVariant::Outline);
+                    s.foreground = theme.muted_foreground;
+                    s
+                })
+                .on_press(|| Msg::SetMode(crate::config::EditMode::Express))
+        };
+
+        let btn_advanced = if !is_express {
+            Button::new("Advanced ⚙")
+                .outline()
+                .size(btn_size)
+                .style(|theme| {
+                    let mut s = ButtonStyle::from_theme(theme, ButtonVariant::Outline);
+                    s.border = Some(theme.primary);
+                    s.foreground = theme.primary;
+                    s
+                })
+                .on_press(|| Msg::SetMode(crate::config::EditMode::Advanced))
+        } else {
+            Button::new("Advanced ⚙")
+                .outline()
+                .size(btn_size)
+                .style(|theme| {
+                    let mut s = ButtonStyle::from_theme(theme, ButtonVariant::Outline);
+                    s.foreground = theme.muted_foreground;
+                    s
+                })
+                .on_press(|| Msg::SetMode(crate::config::EditMode::Advanced))
+        };
+
+        ctx.component("btn-empty-mode-express", btn_express, express_rect);
+        ctx.component("btn-empty-mode-advanced", btn_advanced, advanced_rect);
+    }
+
     let hero_y = area.y.saturating_add(area.height / 4);
     ctx.paint(move |pctx| {
         let lines = vec![
@@ -816,7 +912,6 @@ fn declare_active_workspace(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
     // 1. Tab Strip Row (3 rows tall when large)
     let tab_row = Rect::new(area.x, area.y, area.width, tab_h);
     let close_w = 11u16.min(tab_row.width);
-    let tabs_w = tab_row.width.saturating_sub(close_w.saturating_add(2));
     let close_rect = Rect::new(
         tab_row.right().saturating_sub(close_w),
         tab_row.y,
@@ -824,14 +919,149 @@ fn declare_active_workspace(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
         tab_h,
     );
 
-    let active_tab_idx = ctx.state().active_tab_idx;
-    let mut cur_x = tab_row.x;
-    let max_x = tab_row.x.saturating_add(tabs_w);
+    // Mode Buttons: Express ⚡ / Advanced ⚙ side-by-side with borders and active background
+    let express_btn_w: u16 = 13;
+    let advanced_btn_w: u16 = 14;
+    let mode_total_w: u16 = express_btn_w
+        .saturating_add(1)
+        .saturating_add(advanced_btn_w); // 28
+    let (express_rect, advanced_rect) = if tab_row.width >= 56 {
+        let start_x = close_rect.x.saturating_sub(mode_total_w).saturating_sub(1);
+        (
+            Rect::new(start_x, tab_row.y, express_btn_w, tab_h),
+            Rect::new(
+                start_x.saturating_add(express_btn_w).saturating_add(1),
+                tab_row.y,
+                advanced_btn_w,
+                tab_h,
+            ),
+        )
+    } else {
+        (Rect::default(), Rect::default())
+    };
 
-    for (i, t) in ctx.state().tabs.iter().enumerate() {
-        if cur_x >= max_x {
+    let tabs_right_limit = if express_rect.width > 0 {
+        express_rect.x.saturating_sub(1)
+    } else {
+        close_rect.x.saturating_sub(1)
+    };
+    let tabs_avail_w = tabs_right_limit.saturating_sub(tab_row.x);
+
+    let total_tabs = ctx.state().tabs.len();
+    let active_tab_idx = ctx.state().active_tab_idx;
+    let active_idx = active_tab_idx
+        .unwrap_or(0)
+        .min(total_tabs.saturating_sub(1));
+
+    let btn_pad: u16 = if use_large_chrome { 4 } else { 2 };
+    let x_btn_w: u16 = if use_large_chrome { 5 } else { 3 };
+
+    // Calculate individual full widths for each tab
+    let mut tab_widths: Vec<u16> = Vec::with_capacity(total_tabs);
+    for t in &ctx.state().tabs {
+        let title = if t.dirty {
+            format!("● {}", t.label)
+        } else {
+            t.label.clone()
+        };
+        let title_len = title.chars().count() as u16;
+        let tab_btn_w = title_len.saturating_add(btn_pad).max(6);
+        let full_w = tab_btn_w.saturating_add(x_btn_w).saturating_add(1);
+        tab_widths.push(full_w);
+    }
+
+    let all_tabs_w: u16 = tab_widths.iter().sum();
+    let is_overflowing = all_tabs_w > tabs_avail_w && total_tabs > 1;
+
+    let counter_str = format!("({}/{})", active_idx + 1, total_tabs);
+    let counter_w = 7u16.max(counter_str.chars().count() as u16 + 1);
+
+    // Pinned navigation controls:
+    // Left: [◀] (4 cols) + 1 col gap = 5 cols
+    // Right: 1 col gap + counter (counter_w cols) + 1 col gap + [▶] (4 cols) = counter_w + 6 cols
+    let nav_prev_w: u16 = 4;
+    let nav_next_w: u16 = 4;
+    let reserved_nav_w: u16 = nav_prev_w
+        .saturating_add(1)
+        .saturating_add(1)
+        .saturating_add(counter_w)
+        .saturating_add(1)
+        .saturating_add(nav_next_w);
+
+    let (start_idx, end_idx) = if !is_overflowing {
+        (0, total_tabs)
+    } else {
+        let avail_for_tabs = tabs_avail_w.saturating_sub(reserved_nav_w);
+        let mut s = active_idx;
+        let mut cur_w = tab_widths.get(active_idx).copied().unwrap_or(15);
+        while s > 0 {
+            let prev_w = tab_widths[s - 1];
+            if cur_w.saturating_add(prev_w) <= avail_for_tabs {
+                cur_w = cur_w.saturating_add(prev_w);
+                s -= 1;
+            } else {
+                break;
+            }
+        }
+        let mut e = s;
+        let mut f_w = 0u16;
+        while e < total_tabs {
+            let next_w = tab_widths[e];
+            if f_w.saturating_add(next_w) <= avail_for_tabs || e == active_idx {
+                f_w = f_w.saturating_add(next_w);
+                e += 1;
+            } else {
+                break;
+            }
+        }
+        (s, e)
+    };
+
+    let (tab_start_x, tabs_max_x) = if is_overflowing {
+        // 1. Pinned Left Navigation Arrow: [◀]
+        let prev_rect = Rect::new(tab_row.x, tab_row.y, nav_prev_w, tab_h);
+        let prev_btn = Button::new("◀")
+            .size(btn_size)
+            .outline()
+            .on_press(|| Msg::CycleTab(false));
+        ctx.component("tab-nav-prev", prev_btn, prev_rect);
+
+        // 2. Pinned Right Navigation Controls: counter (X/Y) and [▶] at fixed coordinates
+        let next_x = tabs_right_limit.saturating_sub(nav_next_w);
+        let next_rect = Rect::new(next_x, tab_row.y, nav_next_w, tab_h);
+        let next_btn = Button::new("▶")
+            .size(btn_size)
+            .outline()
+            .on_press(|| Msg::CycleTab(true));
+        ctx.component("tab-nav-next", next_btn, next_rect);
+
+        let counter_x = next_x.saturating_sub(counter_w).saturating_sub(1);
+        let counter_rect = Rect::new(counter_x, tab_row.y.saturating_add(tab_h / 2), counter_w, 1);
+        ctx.paint(move |pctx| {
+            pctx.widget(
+                Paragraph::new(Line::from(Span::styled(
+                    counter_str,
+                    Style::default().fg(pctx.theme.muted_foreground),
+                )))
+                .alignment(ratatui::layout::Alignment::Center),
+                counter_rect,
+            );
+        });
+
+        (
+            tab_row.x.saturating_add(nav_prev_w).saturating_add(1),
+            counter_x.saturating_sub(1),
+        )
+    } else {
+        (tab_row.x, tabs_right_limit)
+    };
+
+    let mut cur_x = tab_start_x;
+    for i in start_idx..end_idx {
+        if cur_x >= tabs_max_x {
             break;
         }
+        let t = &ctx.state().tabs[i];
         let title = if t.dirty {
             format!("● {}", t.label)
         } else {
@@ -840,22 +1070,17 @@ fn declare_active_workspace(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
         let is_active = active_tab_idx == Some(i);
 
         let title_len = title.chars().count() as u16;
-        let btn_pad: u16 = if use_large_chrome { 4 } else { 2 };
         let tab_btn_w = title_len.saturating_add(btn_pad).max(6);
-        let x_btn_w: u16 = if use_large_chrome { 5 } else { 3 };
 
-        let remaining = max_x.saturating_sub(cur_x);
-        if remaining < 4 {
+        if cur_x.saturating_add(tab_btn_w).saturating_add(x_btn_w) > tabs_max_x && i != active_idx {
             break;
         }
 
-        let actual_tab_w = tab_btn_w.min(remaining.saturating_sub(x_btn_w));
-        let tab_btn_rect = Rect::new(cur_x, tab_row.y, actual_tab_w, tab_h);
-        cur_x = cur_x.saturating_add(actual_tab_w);
+        let tab_btn_rect = Rect::new(cur_x, tab_row.y, tab_btn_w, tab_h);
+        cur_x = cur_x.saturating_add(tab_btn_w);
 
-        let actual_x_w = x_btn_w.min(max_x.saturating_sub(cur_x));
-        let x_btn_rect = Rect::new(cur_x, tab_row.y, actual_x_w, tab_h);
-        cur_x = cur_x.saturating_add(actual_x_w).saturating_add(1);
+        let x_btn_rect = Rect::new(cur_x, tab_row.y, x_btn_w, tab_h);
+        cur_x = cur_x.saturating_add(x_btn_w).saturating_add(1);
 
         let tab_id = t.id.clone();
         let tab_id_close = t.id.clone();
@@ -887,6 +1112,75 @@ fn declare_active_workspace(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
             close_comp,
             x_btn_rect,
         );
+    }
+
+    if express_rect.width > 0 {
+        let is_express = ctx.state().user_config.mode == crate::config::EditMode::Express;
+
+        ctx.paint(move |pctx| {
+            let active_rect = if is_express {
+                express_rect
+            } else {
+                advanced_rect
+            };
+            let bg = if pctx.state().is_ssh {
+                pctx.theme.surface
+            } else {
+                pctx.theme.secondary
+            };
+            pctx.with_buffer(active_rect, |rect, buf| {
+                buf.set_style(rect, Style::default().bg(bg));
+            });
+        });
+
+        let btn_express = if is_express {
+            Button::new("Express ⚡")
+                .outline()
+                .size(btn_size)
+                .style(|theme| {
+                    let mut s = ButtonStyle::from_theme(theme, ButtonVariant::Outline);
+                    s.border = Some(theme.primary);
+                    s.foreground = theme.primary;
+                    s
+                })
+                .on_press(|| Msg::SetMode(crate::config::EditMode::Express))
+        } else {
+            Button::new("Express ⚡")
+                .outline()
+                .size(btn_size)
+                .style(|theme| {
+                    let mut s = ButtonStyle::from_theme(theme, ButtonVariant::Outline);
+                    s.foreground = theme.muted_foreground;
+                    s
+                })
+                .on_press(|| Msg::SetMode(crate::config::EditMode::Express))
+        };
+
+        let btn_advanced = if !is_express {
+            Button::new("Advanced ⚙")
+                .outline()
+                .size(btn_size)
+                .style(|theme| {
+                    let mut s = ButtonStyle::from_theme(theme, ButtonVariant::Outline);
+                    s.border = Some(theme.primary);
+                    s.foreground = theme.primary;
+                    s
+                })
+                .on_press(|| Msg::SetMode(crate::config::EditMode::Advanced))
+        } else {
+            Button::new("Advanced ⚙")
+                .outline()
+                .size(btn_size)
+                .style(|theme| {
+                    let mut s = ButtonStyle::from_theme(theme, ButtonVariant::Outline);
+                    s.foreground = theme.muted_foreground;
+                    s
+                })
+                .on_press(|| Msg::SetMode(crate::config::EditMode::Advanced))
+        };
+
+        ctx.component("btn-mode-express", btn_express, express_rect);
+        ctx.component("btn-mode-advanced", btn_advanced, advanced_rect);
     }
 
     ctx.component(
@@ -952,31 +1246,50 @@ fn declare_toolbar(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect, btn_size: But
         .filter(|r| matches!(r.kind, Row::Field { .. }))
         .count();
 
-    let btn_refresh_label = "⟳ Refresh";
+    let btn_refresh_label = if area.width >= 88 {
+        "⟳ Refresh"
+    } else {
+        "⟳"
+    };
     let btn_import_label = "↓ Import";
+    let btn_quick_label = "+ Quick";
     let btn_fields_label = "+ Fields";
-    let btn_validate_label = "✓ Validate";
-    let btn_preview_label = "⎙ Preview & Save";
+    let btn_validate_label = if area.width >= 88 {
+        "✓ Validate"
+    } else {
+        "✓"
+    };
+    let btn_preview_label = if area.width >= 88 {
+        "⎙ Preview & Save"
+    } else {
+        "⎙ Save"
+    };
 
     let w_refresh = (btn_refresh_label.chars().count() as u16).saturating_add(4);
     let w_import = (btn_import_label.chars().count() as u16).saturating_add(4);
+    let w_quick = (btn_quick_label.chars().count() as u16).saturating_add(4);
     let w_fields = (btn_fields_label.chars().count() as u16).saturating_add(4);
     let w_validate = (btn_validate_label.chars().count() as u16).saturating_add(4);
     let w_preview = (btn_preview_label.chars().count() as u16).saturating_add(4);
-    let btn_gap = 2u16;
+    let btn_gap = if area.width >= 105 { 2u16 } else { 1u16 };
     let total_btns = w_refresh
         .saturating_add(w_import)
+        .saturating_add(w_quick)
         .saturating_add(w_fields)
         .saturating_add(w_validate)
         .saturating_add(w_preview)
-        .saturating_add(btn_gap * 4);
+        .saturating_add(btn_gap * 5);
 
-    let text_max_w = if area.width > total_btns.saturating_add(10) {
+    let text_max_w = if area.width > total_btns.saturating_add(4) {
         area.width.saturating_sub(total_btns.saturating_add(2))
     } else {
         area.width
     };
 
+    let mode_str = match ctx.state().user_config.mode {
+        crate::config::EditMode::Express => "Express",
+        crate::config::EditMode::Advanced => "Advanced",
+    };
     ctx.paint(move |pctx| {
         let line = Line::from(vec![
             Span::styled(
@@ -986,7 +1299,7 @@ fn declare_toolbar(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect, btn_size: But
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                format!("  ({api_version} • {field_count} fields)"),
+                format!("  ({api_version} • {mode_str} • {field_count} fields)"),
                 Style::default().fg(pctx.theme.muted_foreground),
             ),
         ]);
@@ -995,7 +1308,7 @@ fn declare_toolbar(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect, btn_size: But
         pctx.widget(Paragraph::new(line), text_rect);
     });
 
-    if area.width > total_btns.saturating_add(10) {
+    if area.width > total_btns {
         let btn_h = btn_size.height();
         let start_x = area.right().saturating_sub(total_btns);
         let r_refresh = Rect::new(start_x, area.y, w_refresh, btn_h);
@@ -1005,8 +1318,14 @@ fn declare_toolbar(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect, btn_size: But
             w_import,
             btn_h,
         );
-        let r_fields = Rect::new(
+        let r_quick = Rect::new(
             r_import.right().saturating_add(btn_gap),
+            area.y,
+            w_quick,
+            btn_h,
+        );
+        let r_fields = Rect::new(
+            r_quick.right().saturating_add(btn_gap),
             area.y,
             w_fields,
             btn_h,
@@ -1042,6 +1361,14 @@ fn declare_toolbar(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect, btn_size: But
                 .disabled(!is_connected)
                 .on_press(|| Msg::OpenClusterImportManifest),
             r_import,
+        );
+        ctx.component(
+            "btn-quick",
+            Button::new(btn_quick_label)
+                .outline()
+                .size(btn_size)
+                .on_press(|| Msg::OpenQuickAdd),
+            r_quick,
         );
         ctx.component(
             "btn-fields",
@@ -2986,4 +3313,95 @@ fn declare_context_switcher_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
         );
 
     ctx.modal(MODAL_CONTEXT_SWITCHER, dialog, ctx.area());
+}
+
+fn declare_quick_add_modal(ctx: &mut DeclareCtx<'_, App, Msg>) {
+    let presets = ctx.state().quick_add_modal.presets.clone();
+    let outer_w = (ctx.area().width.saturating_sub(10)).clamp(60, 96);
+
+    let items: Vec<ListItem<String>> = presets
+        .iter()
+        .map(|(p, _)| ListItem::new(p.id.to_string(), p.title.to_string()))
+        .collect();
+
+    let dialog = Dialog::new()
+        .title(" Quick Add Presets ")
+        .description("Instantly mount common configuration blocks (Tolerations, NodeSelector, Resources, Probes...)")
+        .outer_width(outer_w)
+        .on_dismiss(|| Msg::CloseModal)
+        .content(14, move |ctx| {
+            let body = ctx.area();
+            if body.height < 4 {
+                return;
+            }
+            let list_rect = Rect::new(body.x, body.y, body.width, body.height);
+
+            ctx.component(
+                "list",
+                List::new(items)
+                    .focus_symbol("▸ ")
+                    .selected_marker("● ")
+                    .unselected_marker("○ ")
+                    .item_focus(
+                        |app: &App| app.quick_add_modal.cursor.clone(),
+                        Msg::QuickAddCursorChanged,
+                    )
+                    .selection(
+                        |app: &App| app.quick_add_modal.selected.clone(),
+                        Msg::QuickAddSelect,
+                    )
+                    .paint_item(move |app: &App, row| {
+                        let is_cursor = app.quick_add_modal.cursor.as_deref() == Some(row.value);
+                        let is_selected =
+                            app.quick_add_modal.selected.as_deref() == Some(row.value);
+                        let is_active = is_cursor || is_selected;
+                        if let Some((p, _)) = app
+                            .quick_add_modal
+                            .presets
+                            .iter()
+                            .find(|(p, _)| p.id == row.value)
+                        {
+                            let group_span = Span::styled(
+                                format!("[{}] ", p.group),
+                                Style::default()
+                                    .fg(app.theme().primary)
+                                    .add_modifier(Modifier::BOLD),
+                            );
+                            let title_span = Span::styled(
+                                p.title,
+                                if is_active {
+                                    Style::default()
+                                        .fg(app.theme().foreground)
+                                        .add_modifier(Modifier::BOLD)
+                                } else {
+                                    Style::default().fg(app.theme().foreground)
+                                },
+                            );
+                            let desc_span = Span::styled(
+                                format!(" — {}", p.description),
+                                Style::default().fg(app.theme().muted_foreground),
+                            );
+                            Text::from(Line::from(vec![group_span, title_span, desc_span]))
+                        } else {
+                            Text::from(row.label.to_string())
+                        }
+                    }),
+                list_rect,
+            );
+        })
+        .action(
+            "cancel",
+            Button::new("Cancel")
+                .outline()
+                .size(ButtonSize::Large)
+                .on_press(|| Msg::CloseModal),
+        )
+        .action(
+            "mount",
+            Button::new("Mount Preset")
+                .size(ButtonSize::Large)
+                .on_press(|| Msg::QuickAddCommit),
+        );
+
+    ctx.modal(crate::modals::MODAL_QUICK_ADD, dialog, ctx.area());
 }

@@ -1,11 +1,16 @@
 pub mod emitter;
 pub mod field;
+pub mod links;
 pub mod loader;
+pub mod presets;
 pub mod state;
 
+pub use links::{get_link_rules_for_kind, LinkRule, LinkTracker};
+pub use presets::{get_applicable_presets, resolve_pod_prefix, QuickAddPreset, PRESETS};
+
 pub use field::{
-    build_form, build_path_tree, classify, group_sections, is_field_required, schema_lookup_path,
-    FieldKind, FormField, PathTree, Row,
+    build_form, build_form_with_mode, build_path_tree, classify, group_sections, is_field_required,
+    schema_lookup_path, FieldKind, FormField, PathTree, Row,
 };
 
 // Re-exports for convenience matching Python module structure
