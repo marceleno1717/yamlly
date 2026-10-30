@@ -5,12 +5,37 @@ pub mod k8s;
 pub mod modals;
 pub mod ui;
 
-use std::io;
+use std::io::{self, BufWriter, Write};
 use std::time::Duration;
 
 use crate::app::App;
+use ratatui::Terminal;
+use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::event;
+use ratatui::crossterm::execute;
+use ratatui::crossterm::terminal::{
+    self, BeginSynchronizedUpdate, EndSynchronizedUpdate, EnterAlternateScreen,
+};
 use ratcn::crossterm::InputModes;
+
+pub type AppTerminal = Terminal<CrosstermBackend<BufWriter<io::Stdout>>>;
+
+/// Initialize the terminal with raw mode, alternate screen, and a buffered stdout backend
+/// to consolidate rendering writes and avoid packet fragmentation over SSH.
+fn init_terminal() -> io::Result<AppTerminal> {
+    terminal::enable_raw_mode()?;
+    let mut stdout = BufWriter::with_capacity(64 * 1024, io::stdout());
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    Terminal::new(backend)
+}
+
+/// Restore the terminal by disabling raw mode and leaving the alternate screen.
+fn restore_terminal(terminal: &mut AppTerminal) {
+    let _ = execute!(terminal.backend_mut(), terminal::LeaveAlternateScreen);
+    let _ = terminal.backend_mut().flush();
+    let _ = terminal::disable_raw_mode();
+}
 
 /// Entry point shared by the `yamlly` and `ymly` CLI binaries.
 pub fn run_cli() -> io::Result<()> {
@@ -67,7 +92,7 @@ pub fn run_cli() -> io::Result<()> {
 }
 
 fn run_tui(files: Vec<String>) -> io::Result<()> {
-    let mut terminal = ratatui::init();
+    let mut terminal = init_terminal()?;
     let _input_modes = InputModes::new().mouse().paste().enable()?;
 
     let mut ratcn = ui::new_runtime();
@@ -79,12 +104,12 @@ fn run_tui(files: Vec<String>) -> io::Result<()> {
     let res = event_loop(&mut terminal, &mut ratcn, &mut app);
 
     drop(_input_modes);
-    ratatui::restore();
+    restore_terminal(&mut terminal);
     res
 }
 
 fn event_loop(
-    terminal: &mut ratatui::DefaultTerminal,
+    terminal: &mut AppTerminal,
     ratcn: &mut ratcn::runtime::Ratcn<App, crate::app::Msg>,
     app: &mut App,
 ) -> io::Result<()> {
@@ -93,9 +118,11 @@ fn event_loop(
         app.tick_clock();
 
         if app.ui_dirty {
+            execute!(terminal.backend_mut(), BeginSynchronizedUpdate)?;
             terminal.draw(|frame| {
                 ui::render(ratcn, frame, app);
             })?;
+            execute!(terminal.backend_mut(), EndSynchronizedUpdate)?;
             app.ui_dirty = false;
         }
 

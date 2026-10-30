@@ -72,6 +72,12 @@ pub fn render(ratcn: &mut Ratcn<App, Msg>, frame: &mut Frame, app: &App) {
 /// Route a `ratcn::runtime::Event` through the retained surface, falling back to
 /// app-level shortcuts when the focused component ignores the event.
 pub fn handle_event(ratcn: &mut Ratcn<App, Msg>, app: &mut App, event: Event) -> bool {
+    // Drop mouse motion events to prevent flooding over SSH or high-latency links
+    if let Event::Mouse(mouse) = &event
+        && mouse.kind == MouseKind::Moved
+    {
+        return false;
+    }
     if app.handle_global_ctrl_shortcut(&event) {
         return true;
     }
@@ -230,9 +236,14 @@ pub fn handle_crossterm_event(
 fn declare_app(ctx: &mut DeclareCtx<'_, App, Msg>) {
     let root = ctx.area();
 
-    // Base background fill
+    // Base background fill (use transparent/reset on SSH sessions to eliminate ~70% truecolor escape traffic)
     ctx.paint(move |pctx| {
-        let bg = pctx.theme.background;
+        let is_ssh = pctx.state().is_ssh;
+        let bg = if is_ssh {
+            Color::Reset
+        } else {
+            pctx.theme.background
+        };
         let fg = pctx.theme.foreground;
         pctx.with_buffer(root, |area, buf| {
             buf.set_style(area, Style::default().bg(bg).fg(fg));
