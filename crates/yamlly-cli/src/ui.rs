@@ -349,7 +349,7 @@ fn declare_header(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
             )
         };
 
-        let line = Line::from(vec![
+        let mut spans = vec![
             Span::raw(" "),
             Span::styled(
                 " ◆ yamlly ",
@@ -358,6 +358,20 @@ fn declare_header(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
                     .fg(primary_fg)
                     .add_modifier(Modifier::BOLD),
             ),
+        ];
+
+        if pctx.state().is_ssh {
+            spans.push(Span::styled(" ", Style::default()));
+            spans.push(Span::styled(
+                " ⚡ SSH ",
+                Style::default()
+                    .bg(pctx.theme.secondary)
+                    .fg(pctx.theme.secondary_foreground)
+                    .add_modifier(Modifier::BOLD),
+            ));
+        }
+
+        spans.extend([
             Span::styled("  K8s Manifest Studio  ", Style::default().fg(muted)),
             Span::styled("│  ", Style::default().fg(pctx.theme.border)),
             Span::styled(
@@ -368,6 +382,8 @@ fn declare_header(ctx: &mut DeclareCtx<'_, App, Msg>, area: Rect) {
             ),
             Span::styled(status_text, Style::default().fg(pctx.theme.foreground)),
         ]);
+
+        let line = Line::from(spans);
 
         pctx.with_buffer(area, |rect, buf| {
             buf.set_style(rect, Style::default().bg(surface));
